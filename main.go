@@ -63,9 +63,7 @@ func NewWorker(interval time.Duration) *Worker {
 
 // Run starts the worker and listens for a shutdown call.
 func (w *Worker) Run() {
-
 	log.Println("Worker Started")
-
 	// Loop that runs forever
 	for {
 		select {
@@ -89,10 +87,8 @@ func (w *Worker) Run() {
 // Shutdown is a graceful shutdown mechanism 
 func (w *Worker) Shutdown() {
 	w.Stopped = true
-
 	w.ShutdownChannel <- "Down"
 	<-w.ShutdownChannel
-
 	close(w.ShutdownChannel)
 }
 
@@ -103,7 +99,6 @@ func (w *Worker) Action() {
 	it := InstanceQueue.Iterator()
 	for it.Next() { //Sorted by time
 		timestamp, InstanceId := it.Key().(int64), it.Value().(int)
-		
 		if timestamp <= time.Now().UnixMicro() {
 			DockerId := DockerInstance[InstanceId]
 			deleteContainer(DockerId)
@@ -129,51 +124,40 @@ func getPortainerJWT() {
 		"Username": PortainerUsername,
 		"Password": PortainerPassword,
 	})
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 	
 	resp, err := http.Post(PortainerURL + "/api/auth", "application/json", bytes.NewBuffer(requestBody))
-	if err != nil {
-		panic(err)
-	}
+    if err != nil { panic(err) }
 	
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-	log.Println(string(body))
+	if err != nil { panic(err) }
+	
 	var raw map[string]string
-    if err := json.Unmarshal(body, &raw); err != nil {
-        panic(err)
-    }
+    if err := json.Unmarshal(body, &raw); err != nil { panic(err) }
+	
 	PortainerJWT = raw["jwt"]
 }
 
 func getEndpoints() {
 	client := http.Client{}
 	req, err := http.NewRequest("GET", PortainerURL + "/api/endpoints", nil)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 
 	req.Header = http.Header{
 		"Authorization": []string{"Bearer " + PortainerJWT},
 	}
 
 	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
+	
 	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
+	
 	log.Println(string(body))
 }
 
-func launchContainer(image_name string, cmds []string, _internal_port int, _external_port int) string {
+func launchContainer(container_name string, image_name string, cmds []string, _internal_port int, _external_port int) string {
 	internal_port := strconv.Itoa(_internal_port)
 	external_port := strconv.Itoa(_external_port)
 	
@@ -191,10 +175,8 @@ func launchContainer(image_name string, cmds []string, _internal_port int, _exte
 	requestBody := []byte(tmp)
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", PortainerURL + "/api/endpoints/2/docker/containers/create?name=mycontainer_" + external_port, bytes.NewBuffer(requestBody))
-	if err != nil {
-		panic(err)
-	}
+	req, err := http.NewRequest("POST", PortainerURL + "/api/endpoints/2/docker/containers/create?name=" + container_name + "_" + external_port, bytes.NewBuffer(requestBody))
+	if err != nil { panic(err) }
 
 	req.Header = http.Header{
 		"Authorization": []string{"Bearer " + PortainerJWT},
@@ -202,17 +184,14 @@ func launchContainer(image_name string, cmds []string, _internal_port int, _exte
 	}
 
 	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 	log.Println(string(body))
 	
-	id := string(body[7:(7+64)])
-	log.Println(id)
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil { panic(err) }
+	id := raw["Id"].(string)
 	
 	startContainer(id)
 	
@@ -222,70 +201,53 @@ func launchContainer(image_name string, cmds []string, _internal_port int, _exte
 func containersList(){
 	client := http.Client{}
 	req, err := http.NewRequest("GET", PortainerURL + "/api/endpoints/2/docker/containers/json", nil)
-	if err != nil {
-		panic(err)
-	}
+    if err != nil { panic(err) }
 
 	req.Header = http.Header{
 		"Authorization": []string{"Bearer " + PortainerJWT},
 	}
 
 	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
+	
 	log.Println(string(body))
 }
 
 func startContainer(id string) {
-	tmp := "{}"
-	log.Println(tmp)
-	requestBody := []byte(tmp)
+	requestBody := []byte("{}")
 
 	client := http.Client{}
 	req, err := http.NewRequest("POST", PortainerURL + "/api/endpoints/2/docker/containers/" + id + "/start", bytes.NewBuffer(requestBody))
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 
 	req.Header = http.Header{
 		"Authorization": []string{"Bearer " + PortainerJWT},
 	}
 
 	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
+	
 	log.Println(string(body))
 }
 
 func deleteContainer(id string) {
 	client := http.Client{}
 	req, err := http.NewRequest("DELETE", PortainerURL + "/api/endpoints/2/docker/containers/" + id + "?force=true", nil)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 
 	req.Header = http.Header{
 		"Authorization": []string{"Bearer " + PortainerJWT},
 	}
 
 	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
+	
 	log.Println(string(body))
 }
 
@@ -332,9 +294,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	userid, err := strconv.Atoi(_userid[0])
-	if err != nil {
-        panic(err)
-    }
+	if err != nil { panic(err) }
 	if !validateUserid(userid) {
 		http.Error(w, "Invalid userid", http.StatusForbidden)
 		return
@@ -346,9 +306,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	challid, err := strconv.Atoi(_challid[0])
-	if err != nil {
-		panic(err)
-    }
+	if err != nil { panic(err) }
 	if !validateChallid(challid) {
 		http.Error(w, "Invalid challid", http.StatusForbidden)
 		return
@@ -367,7 +325,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	InstanceTimeLeft[InstanceId] = time.Now().Unix() + DefaultSecondsPerInstance
 	InstanceQueue.Put(time.Now().UnixMicro() + DefaultMicrosecondsPerInstance, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	external_port := getRandomPort()
-	DockerId := launchContainer("nginx:latest", []string{"nginx", "-g", "daemon off;"}, 80, external_port)
+	DockerId := launchContainer("nginx", "nginx:latest", []string{"nginx", "-g", "daemon off;"}, 80, external_port)
 	DockerInstance[InstanceId] = DockerId
 	
 	fmt.Fprintf(w, strconv.Itoa(external_port))
@@ -382,9 +340,7 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	userid, err := strconv.Atoi(_userid[0])
-	if err != nil {
-        panic(err)
-    }
+	if err != nil { panic(err) }
 	if !validateUserid(userid) {
 		http.Error(w, "Invalid userid", http.StatusForbidden)
 		return
@@ -409,9 +365,7 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	userid, err := strconv.Atoi(_userid[0])
-	if err != nil {
-        panic(err)
-    }
+	if err != nil { panic(err) }
 	if !validateUserid(userid) {
 		http.Error(w, "Invalid userid", http.StatusForbidden)
 		return
