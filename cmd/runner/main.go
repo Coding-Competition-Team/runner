@@ -30,11 +30,11 @@ type InstanceData struct {
 
 var ActiveUserInstance map[int]int //UserId -> InstanceId
 var InstanceMap map[int]InstanceData //InstanceId -> InstanceData
-var InstanceQueue *treebidimap.Map //Unix (Micro) Timestamp of Instance Timeout -> InstanceId
+var InstanceQueue *treebidimap.Map //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
 
 var NextInstanceId int
 var DefaultSecondsPerInstance int64
-var DefaultMicrosecondsPerInstance int64
+var DefaultNanosecondsPerInstance int64
 
 var PortainerURL string
 var PortainerUsername string
@@ -103,7 +103,7 @@ func (w *Worker) Action() {
 	it := InstanceQueue.Iterator()
 	for it.Next() { //Sorted by time
 		timestamp, InstanceId := it.Key().(int64), it.Value().(int)
-		if timestamp <= time.Now().UnixMicro() {
+		if timestamp <= time.Now().UnixNano() {
 			DockerId := InstanceMap[InstanceId].DockerId
 			deleteContainer(DockerId)
 			UserId := InstanceMap[InstanceId].UserId
@@ -323,7 +323,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	NextInstanceId++
 	
 	ActiveUserInstance[userid] = InstanceId
-	InstanceQueue.Put(time.Now().UnixMicro() + DefaultMicrosecondsPerInstance, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
+	InstanceQueue.Put(time.Now().UnixNano() + DefaultNanosecondsPerInstance, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	external_port := getRandomPort()
 	DockerId := launchContainer("nginx", "nginx:latest", []string{"nginx", "-g", "daemon off;"}, 80, external_port)
 	InstanceMap[InstanceId] = InstanceData{UserId: userid, InstanceTimeLeft: time.Now().Unix() + DefaultSecondsPerInstance, DockerId: DockerId}
@@ -387,7 +387,7 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 		panic("InstanceId missing")
 	}
 	InstanceQueue.Remove(a)
-	InstanceQueue.Put(a.(int64) + DefaultMicrosecondsPerInstance, InstanceId) //Replace
+	InstanceQueue.Put(a.(int64) + DefaultNanosecondsPerInstance, InstanceId) //Replace
 }
 
 func main() {
@@ -397,7 +397,7 @@ func main() {
 	InstanceMap = make(map[int]InstanceData)
 	NextInstanceId = 1
 	DefaultSecondsPerInstance = 60
-	DefaultMicrosecondsPerInstance = DefaultSecondsPerInstance*1000000
+	DefaultNanosecondsPerInstance = DefaultSecondsPerInstance * 1e9
 	InstanceQueue = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator)
 	
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //todo remove
