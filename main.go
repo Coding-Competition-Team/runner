@@ -1,9 +1,9 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "net/http"
+	"fmt"
+	"log"
+	"net/http"
 	"strconv"
 	"time"
 	"bytes"
@@ -74,7 +74,7 @@ func (w *Worker) Run() {
 			// This breaks out of the select, not the for loop.
 			break
 		}
-
+		
 		started := time.Now()
 		w.Action()
 		finished := time.Now()
@@ -127,14 +127,14 @@ func getPortainerJWT() {
 	if err != nil { panic(err) }
 	
 	resp, err := http.Post(PortainerURL + "/api/auth", "application/json", bytes.NewBuffer(requestBody))
-    if err != nil { panic(err) }
+	if err != nil { panic(err) }
 	
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
 	var raw map[string]string
-    if err := json.Unmarshal(body, &raw); err != nil { panic(err) }
+	if err := json.Unmarshal(body, &raw); err != nil { panic(err) }
 	
 	PortainerJWT = raw["jwt"]
 }
@@ -201,7 +201,7 @@ func launchContainer(container_name string, image_name string, cmds []string, _i
 func containersList(){
 	client := http.Client{}
 	req, err := http.NewRequest("GET", PortainerURL + "/api/endpoints/2/docker/containers/json", nil)
-    if err != nil { panic(err) }
+	if err != nil { panic(err) }
 
 	req.Header = http.Header{
 		"Authorization": []string{"Bearer " + PortainerJWT},
@@ -271,7 +271,7 @@ func handleRequests() {
 	http.HandleFunc("/addInstance", addInstance)
 	http.HandleFunc("/getTimeLeft", getTimeLeft)
 	http.HandleFunc("/extendTimeLeft", extendTimeLeft)
-    log.Fatal(http.ListenAndServe(":10000", nil))
+	log.Fatal(http.ListenAndServe(":10000", nil))
 }
 
 //fmt.Println() - console
@@ -286,11 +286,11 @@ func validateChallid(challid int) bool {
 }
 
 func addInstance(w http.ResponseWriter, r *http.Request){
-    params := r.URL.Query()
+	params := r.URL.Query()
 	
 	_userid := params["userid"]
 	if len(_userid) == 0 {
-	    http.Error(w, "Missing userid", http.StatusForbidden)
+		http.Error(w, "Missing userid", http.StatusForbidden)
 		return
 	}
 	userid, err := strconv.Atoi(_userid[0])
@@ -302,7 +302,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	
 	_challid := params["challid"]
 	if len(_challid) == 0 {
-	    http.Error(w, "Missing challid", http.StatusForbidden)
+		http.Error(w, "Missing challid", http.StatusForbidden)
 		return
 	}
 	challid, err := strconv.Atoi(_challid[0])
@@ -332,11 +332,11 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 }
 
 func getTimeLeft(w http.ResponseWriter, r *http.Request){
-    params := r.URL.Query()
+	params := r.URL.Query()
 	
 	_userid := params["userid"]
 	if len(_userid) == 0 {
-	    http.Error(w, "Missing userid", http.StatusForbidden)
+		http.Error(w, "Missing userid", http.StatusForbidden)
 		return
 	}
 	userid, err := strconv.Atoi(_userid[0])
@@ -357,11 +357,11 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request){
 }
 
 func extendTimeLeft(w http.ResponseWriter, r *http.Request){
-    params := r.URL.Query()
+	params := r.URL.Query()
 	
 	_userid := params["userid"]
 	if len(_userid) == 0 {
-	    http.Error(w, "Missing userid", http.StatusForbidden)
+		http.Error(w, "Missing userid", http.StatusForbidden)
 		return
 	}
 	userid, err := strconv.Atoi(_userid[0])
@@ -381,7 +381,7 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 	
 	a, b := InstanceQueue.GetKey(InstanceId)
 	if b == false {
-	    panic("InstanceId missing")
+		panic("InstanceId missing")
 	}
 	InstanceQueue.Remove(a)
 	InstanceQueue.Put(a.(int64) + DefaultMicrosecondsPerInstance, InstanceId) //Replace
@@ -390,7 +390,7 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-    ActiveUserInstance = make(map[int]int)
+	ActiveUserInstance = make(map[int]int)
 	ReverseActiveUserInstance = make(map[int]int)
 	InstanceTimeLeft = make(map[int]int64)
 	DockerInstance = make(map[int]string)
