@@ -18,14 +18,18 @@ import (
 	"github.com/emirpasic/gods/utils"
 )
 
+type InstanceData struct {
+	UserId int
+	InstanceTimeLeft int64 //Unix Timestamp of Instance Timeout
+	DockerId string
+}
+
 //
 // Global Variables
 //
 
 var ActiveUserInstance map[int]int //UserId -> InstanceId
-var ReverseActiveUserInstance map[int]int //InstanceId -> UserId
-var InstanceTimeLeft map[int]int64 //InstanceId -> Unix Timestamp of Instance Timeout
-var DockerInstance map[int]string //InstanceId -> DockerId
+var InstanceMap map[int]InstanceData //InstanceId -> InstanceData
 var InstanceQueue *treebidimap.Map //Unix (Micro) Timestamp of Instance Timeout -> InstanceId
 
 var NextInstanceId int
@@ -100,13 +104,11 @@ func (w *Worker) Action() {
 	for it.Next() { //Sorted by time
 		timestamp, InstanceId := it.Key().(int64), it.Value().(int)
 		if timestamp <= time.Now().UnixMicro() {
-			DockerId := DockerInstance[InstanceId]
+			DockerId := InstanceMap[InstanceId].DockerId
 			deleteContainer(DockerId)
-			UserId := ReverseActiveUserInstance[InstanceId]
+			UserId := InstanceMap[InstanceId].UserId
 			InstanceQueue.Remove(timestamp)
-			delete(DockerInstance, InstanceId)
-			delete(InstanceTimeLeft, InstanceId)
-			delete(ReverseActiveUserInstance, InstanceId)
+			delete(InstanceMap, InstanceId)
 			delete(ActiveUserInstance, UserId)
 			break //Only handle 1 instance a time to prevent tree iterator nonsense
 		}
@@ -321,12 +323,10 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	NextInstanceId++
 	
 	ActiveUserInstance[userid] = InstanceId
-	ReverseActiveUserInstance[InstanceId] = userid
-	InstanceTimeLeft[InstanceId] = time.Now().Unix() + DefaultSecondsPerInstance
 	InstanceQueue.Put(time.Now().UnixMicro() + DefaultMicrosecondsPerInstance, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	external_port := getRandomPort()
 	DockerId := launchContainer("nginx", "nginx:latest", []string{"nginx", "-g", "daemon off;"}, 80, external_port)
-	DockerInstance[InstanceId] = DockerId
+	InstanceMap[InstanceId] = InstanceData{UserId: userid, InstanceTimeLeft: time.Now().Unix() + DefaultSecondsPerInstance, DockerId: DockerId}
 	
 	fmt.Fprintf(w, strconv.Itoa(external_port))
 }
@@ -353,7 +353,7 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request){
 	
 	InstanceId := ActiveUserInstance[userid]
 	
-	fmt.Fprintf(w, strconv.FormatInt(InstanceTimeLeft[InstanceId] - time.Now().Unix(), 10))
+	fmt.Fprintf(w, strconv.FormatInt(InstanceMap[InstanceId].InstanceTimeLeft - time.Now().Unix(), 10))
 }
 
 func extendTimeLeft(w http.ResponseWriter, r *http.Request){
@@ -377,7 +377,10 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 	}
 	
 	InstanceId := ActiveUserInstance[userid]
-	InstanceTimeLeft[InstanceId] += DefaultSecondsPerInstance
+	if entry, ok := InstanceMap[InstanceId]; !ok { panic(err) } else {
+		entry.InstanceTimeLeft += DefaultSecondsPerInstance
+		InstanceMap[InstanceId] = entry
+	}
 	
 	a, b := InstanceQueue.GetKey(InstanceId)
 	if b == false {
@@ -391,9 +394,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	ActiveUserInstance = make(map[int]int)
-	ReverseActiveUserInstance = make(map[int]int)
-	InstanceTimeLeft = make(map[int]int64)
-	DockerInstance = make(map[int]string)
+	InstanceMap = make(map[int]InstanceData)
 	NextInstanceId = 1
 	DefaultSecondsPerInstance = 60
 	DefaultMicrosecondsPerInstance = DefaultSecondsPerInstance*1000000
