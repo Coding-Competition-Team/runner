@@ -18,6 +18,11 @@ import (
 	"github.com/emirpasic/gods/utils"
 )
 
+import (
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+)
+
 type InstanceData struct {
 	UserId int
 	InstanceTimeLeft int64 //Unix Timestamp of Instance Timeout
@@ -35,6 +40,10 @@ var InstanceQueue *treebidimap.Map //Unix (Nano) Timestamp of Instance Timeout -
 var NextInstanceId int
 var DefaultSecondsPerInstance int64
 var DefaultNanosecondsPerInstance int64
+
+var MySQLIP string
+var MySQLUsername string
+var MySQLPassword string
 
 var PortainerURL string
 var PortainerUsername string
@@ -104,17 +113,60 @@ func (w *Worker) Action() {
 	for it.Next() { //Sorted by time
 		timestamp, InstanceId := it.Key().(int64), it.Value().(int)
 		if timestamp <= time.Now().UnixNano() {
+			db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
+			if err != nil { panic(err) }
+			defer db.Close()
+			
+			stmt, err := db.Prepare("DELETE FROM instances WHERE instance_id = ?")
+			if err != nil { panic(err) }
+			defer stmt.Close()
+			
+			_, err = stmt.Exec(InstanceId)
+			if err != nil { panic(err) }
+			
 			DockerId := InstanceMap[InstanceId].DockerId
 			deleteContainer(DockerId)
 			UserId := InstanceMap[InstanceId].UserId
 			InstanceQueue.Remove(timestamp)
 			delete(InstanceMap, InstanceId)
 			delete(ActiveUserInstance, UserId)
+			
 			break //Only handle 1 instance a time to prevent tree iterator nonsense
 		}
 		log.Println(timestamp)
 		log.Println(InstanceId)
 	}
+}
+
+//
+// MySQL API
+//
+
+func syncWithDB() {
+	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
+	if err != nil { panic(err) }
+	defer db.Close()
+
+	rows, err := db.Query("SELECT * FROM instances")
+	if err != nil { panic(err) }
+	defer rows.Close()
+
+	for rows.Next() {
+		var instance_id int
+		var usr_id int
+		var docker_id string
+		var instance_timeout int64
+		if err := rows.Scan(&instance_id, &usr_id, &docker_id, &instance_timeout); err != nil { panic(err) }
+		
+		if (instance_id + 1) > NextInstanceId {
+			NextInstanceId = instance_id + 1
+		}
+		ActiveUserInstance[usr_id] = instance_id
+		InstanceQueue.Put(instance_timeout, instance_id)
+		InstanceMap[instance_id] = InstanceData{UserId: usr_id, InstanceTimeLeft: instance_timeout, DockerId: docker_id}
+	}
+	
+	fmt.Println("DB Sync Complete")
 }
 
 //
@@ -156,7 +208,7 @@ func getEndpoints() {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println(string(body))
+	log.Println("getEndpoints: " + string(body))
 }
 
 func launchContainer(container_name string, image_name string, cmds []string, _internal_port int, _external_port int) string {
@@ -214,7 +266,7 @@ func containersList(){
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println(string(body))
+	log.Println("containersList: " + string(body))
 }
 
 func startContainer(id string) {
@@ -233,7 +285,7 @@ func startContainer(id string) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println(string(body))
+	log.Println("startContainer: " + string(body))
 }
 
 func deleteContainer(id string) {
@@ -250,7 +302,7 @@ func deleteContainer(id string) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println(string(body))
+	log.Println("deleteContainer: " + string(body))
 }
 
 var usedPorts map[int]bool
@@ -325,10 +377,23 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	ActiveUserInstance[userid] = InstanceId
 	InstanceQueue.Put(time.Now().UnixNano() + DefaultNanosecondsPerInstance, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	external_port := getRandomPort()
-	DockerId := launchContainer("nginx", "nginx:latest", []string{"nginx", "-g", "daemon off;"}, 80, external_port)
-	InstanceMap[InstanceId] = InstanceData{UserId: userid, InstanceTimeLeft: time.Now().Unix() + DefaultSecondsPerInstance, DockerId: DockerId}
-	
 	fmt.Fprintf(w, strconv.Itoa(external_port))
+	
+	DockerId := launchContainer("nginx", "nginx:latest", []string{"nginx", "-g", "daemon off;"}, 80, external_port)
+	fmt.Println(DockerId)
+	InstanceTimeLeft := time.Now().Unix() + DefaultSecondsPerInstance
+	InstanceMap[InstanceId] = InstanceData{UserId: userid, InstanceTimeLeft: InstanceTimeLeft, DockerId: DockerId}
+	
+	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
+	if err != nil { panic(err) }
+	defer db.Close()
+	
+	stmt, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, docker_id, instance_timeout) VALUES(?, ?, ?, ?)")
+	if err != nil { panic(err) }
+	defer stmt.Close()
+	
+	_, err = stmt.Exec(InstanceId, userid, DockerId, InstanceTimeLeft)
+	if err != nil { panic(err) }
 }
 
 func getTimeLeft(w http.ResponseWriter, r *http.Request){
@@ -386,8 +451,20 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 	if b == false {
 		panic("InstanceId missing")
 	}
+	NewInstanceTimeLeft := a.(int64) + DefaultNanosecondsPerInstance
 	InstanceQueue.Remove(a)
-	InstanceQueue.Put(a.(int64) + DefaultNanosecondsPerInstance, InstanceId) //Replace
+	InstanceQueue.Put(NewInstanceTimeLeft, InstanceId) //Replace
+	
+	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
+	if err != nil { panic(err) }
+	defer db.Close()
+	
+	stmt, err := db.Prepare("UPDATE instances SET instance_timeout = ? WHERE instance_id = ?")
+	if err != nil { panic(err) }
+	defer stmt.Close()
+	
+	_, err = stmt.Exec(NewInstanceTimeLeft, InstanceId)
+	if err != nil { panic(err) }
 }
 
 func main() {
@@ -400,12 +477,19 @@ func main() {
 	DefaultNanosecondsPerInstance = DefaultSecondsPerInstance * 1e9
 	InstanceQueue = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator)
 	
+	MySQLIP = ""
+	MySQLUsername = ""
+	MySQLPassword = ""
+	
+	syncWithDB()
+	
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //todo remove
 	
 	PortainerURL = ""
 	PortainerUsername = ""
 	PortainerPassword = ""
 	usedPorts = make(map[int]bool)
+	
 	getPortainerJWT()
 	getEndpoints()
 	containersList()
