@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"crypto/tls"
+	"strings"
 )
 
 import (
@@ -27,6 +28,7 @@ type InstanceData struct {
 	UserId int
 	InstanceTimeLeft int64 //Unix Timestamp of Instance Timeout
 	DockerId string
+	Ports []int
 }
 
 //
@@ -36,6 +38,7 @@ type InstanceData struct {
 var ActiveUserInstance map[int]int //UserId -> InstanceId
 var InstanceMap map[int]InstanceData //InstanceId -> InstanceData
 var InstanceQueue *treebidimap.Map //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
+var UsedPorts map[int]bool
 
 var NextInstanceId int
 var DefaultSecondsPerInstance int64
@@ -128,6 +131,9 @@ func (w *Worker) Action() {
 			deleteContainer(DockerId)
 			UserId := InstanceMap[InstanceId].UserId
 			InstanceQueue.Remove(timestamp)
+			for _, v := range InstanceMap[InstanceId].Ports {
+				delete(UsedPorts, v)
+			}
 			delete(InstanceMap, InstanceId)
 			delete(ActiveUserInstance, UserId)
 			
@@ -141,6 +147,21 @@ func (w *Worker) Action() {
 //
 // MySQL API
 //
+
+func deserialize(str string) []string {
+	return strings.Split(str, ",")
+}
+
+func serialize(dat []int) string {
+	str := ""
+	for i, v := range dat {
+		str += strconv.Itoa(v)
+		if (i + 1) < len(dat) {
+			str += ","
+		}
+	}
+	return str
+}
 
 func syncWithDB() {
 	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
@@ -156,14 +177,24 @@ func syncWithDB() {
 		var usr_id int
 		var docker_id string
 		var instance_timeout int64
-		if err := rows.Scan(&instance_id, &usr_id, &docker_id, &instance_timeout); err != nil { panic(err) }
+		var ports_used string
+		if err := rows.Scan(&instance_id, &usr_id, &docker_id, &instance_timeout, &ports_used); err != nil { panic(err) }
 		
 		if (instance_id + 1) > NextInstanceId {
 			NextInstanceId = instance_id + 1
 		}
 		ActiveUserInstance[usr_id] = instance_id
 		InstanceQueue.Put(instance_timeout, instance_id)
-		InstanceMap[instance_id] = InstanceData{UserId: usr_id, InstanceTimeLeft: instance_timeout, DockerId: docker_id}
+		
+		var ports []int
+		deserialized_ports := deserialize(ports_used)
+		for _, v := range deserialized_ports {
+			port, err := strconv.Atoi(v)
+			if err != nil { panic(err) }
+			ports = append(ports, port)
+			UsedPorts[port] = true
+		}
+		InstanceMap[instance_id] = InstanceData{UserId: usr_id, InstanceTimeLeft: instance_timeout, DockerId: docker_id, Ports: ports}
 	}
 	
 	fmt.Println("DB Sync Complete")
@@ -305,13 +336,11 @@ func deleteContainer(id string) {
 	log.Println("deleteContainer: " + string(body))
 }
 
-var usedPorts map[int]bool
-
 func getRandomPort() int { //Returns an (unused) random port from [1024, 65536)
 	for {
 		port := rand.Intn(65536 - 1024) + 1024
-		if !usedPorts[port] {
-			usedPorts[port] = true
+		if !UsedPorts[port] {
+			UsedPorts[port] = true
 			return port
 		}
 	}
@@ -382,17 +411,18 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	DockerId := launchContainer("nginx", "nginx:latest", []string{"nginx", "-g", "daemon off;"}, 80, external_port)
 	fmt.Println(DockerId)
 	InstanceTimeLeft := time.Now().Unix() + DefaultSecondsPerInstance
-	InstanceMap[InstanceId] = InstanceData{UserId: userid, InstanceTimeLeft: InstanceTimeLeft, DockerId: DockerId}
+	InstanceMap[InstanceId] = InstanceData{UserId: userid, InstanceTimeLeft: InstanceTimeLeft, DockerId: DockerId, Ports: []int{external_port}}
 	
 	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
 	if err != nil { panic(err) }
 	defer db.Close()
 	
-	stmt, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, docker_id, instance_timeout) VALUES(?, ?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, docker_id, instance_timeout, ports_used) VALUES(?, ?, ?, ?, ?)")
 	if err != nil { panic(err) }
 	defer stmt.Close()
 	
-	_, err = stmt.Exec(InstanceId, userid, DockerId, InstanceTimeLeft)
+	serialized_ports := serialize([]int{external_port})
+	_, err = stmt.Exec(InstanceId, userid, DockerId, InstanceTimeLeft, serialized_ports)
 	if err != nil { panic(err) }
 }
 
@@ -476,6 +506,11 @@ func main() {
 	DefaultSecondsPerInstance = 60
 	DefaultNanosecondsPerInstance = DefaultSecondsPerInstance * 1e9
 	InstanceQueue = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator)
+	UsedPorts = make(map[int]bool)
+	
+	UsedPorts[8000] = true //Portainer
+	UsedPorts[9443] = true //Portainer
+	UsedPorts[3306] = true //Runner DB
 	
 	MySQLIP = ""
 	MySQLUsername = ""
@@ -488,7 +523,6 @@ func main() {
 	PortainerURL = ""
 	PortainerUsername = ""
 	PortainerPassword = ""
-	usedPorts = make(map[int]bool)
 	
 	getPortainerJWT()
 	getEndpoints()

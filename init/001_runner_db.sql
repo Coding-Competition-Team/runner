@@ -17,5 +17,6 @@ CREATE TABLE instances (
 	usr_id int unsigned NOT NULL,
 	docker_id varchar(64) NOT NULL,
 	instance_timeout bigint unsigned NOT NULL,
+	ports_used varchar(255) NOT NULL,
 	PRIMARY KEY (instance_id)
 );
