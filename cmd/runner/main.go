@@ -17,11 +17,9 @@ import (
 import (
 	"github.com/emirpasic/gods/maps/treebidimap"
 	"github.com/emirpasic/gods/utils"
-)
-
-import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
+	"gopkg.in/yaml.v2"
 )
 
 type InstanceData struct {
@@ -142,6 +140,41 @@ func (w *Worker) Action() {
 		log.Println(timestamp)
 		log.Println(InstanceId)
 	}
+}
+
+//
+// YAML API
+//
+
+func parseInternalPort(str string) string { //Returns the internal port
+	return strings.Split(str, ":")[1]
+}
+
+func dockerComposeCopy(docker_compose string) (string, []int) {
+	yml := make(map[interface{}]interface{})
+	err := yaml.Unmarshal([]byte(data), &yml)
+	if err != nil { panic(err) }
+	
+	var new_ports []int
+	for k1, v1 := range yml["services"].(map[interface{}]interface{}) {
+		raw_port_mappings := v1.(map[interface{}]interface{})["ports"]
+		if raw_port_mappings != nil { //There are ports
+			raw_port_mappings := raw_port_mappings.([]interface{})
+			new_port_mappings := make([]string, len(raw_port_mappings))
+			for k2, v2 := range raw_port_mappings {
+				internal_port := parseInternalPort(v2.(string))
+				external_port := getRandomPort()
+				new_port_mappings[k2] = strconv.Itoa(external_port) + ":" + internal_port
+				new_ports = append(new_ports, external_port)
+			}
+			yml["services"].(map[interface{}]interface{})[k1].(map[interface{}]interface{})["ports"] = new_port_mappings //Override old port mappings
+		}
+	}
+	
+	new_yml, err := yaml.Marshal(&yml)
+	if err != nil { panic(err) }
+	
+	return string(new_yml), new_ports
 }
 
 //
@@ -336,6 +369,71 @@ func deleteContainer(id string) {
 	log.Println("deleteContainer: " + string(body))
 }
 
+func launchStack(stack_name string, docker_compose string) string {
+	json_docker_compose, err := json.Marshal(docker_compose) //Make sure docker_compose is JSON Encoded
+	if err != nil { panic(err) }
+	
+	tmp := "{\"name\":\"" + stack_name + "\",\"stackFileContent\":" + string(json_docker_compose) + "}"
+	log.Println(tmp)
+
+	requestBody := []byte(tmp)
+
+	client := http.Client{}
+	req, err := http.NewRequest("POST", PortainerURL + "/api/stacks?type=2&method=string&endpointId=2", bytes.NewBuffer(requestBody))
+	if err != nil { panic(err) }
+	
+	req.Header = http.Header{
+		"Authorization": []string{"Bearer " + PortainerJWT},
+		"Content-Type": []string{"application/json"},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil { panic(err) }
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil { panic(err) }
+	log.Println(string(body))
+	
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil { panic(err) }
+	id := int(raw["Id"].(float64)) //Cannot directly cast to string
+	
+	return strconv.Itoa(id)
+}
+
+func deleteStack(id string) {
+	client := http.Client{}
+	req, err := http.NewRequest("DELETE", PortainerURL + "/api/stacks/" + id + "?endpointId=2", nil)
+	if err != nil { panic(err) }
+
+	req.Header = http.Header{
+		"Authorization": []string{"Bearer " + PortainerJWT},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil { panic(err) }
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil { panic(err) }
+	
+	log.Println("deleteStack: " + string(body))
+}
+
+func stacksList(){
+	client := http.Client{}
+	req, err := http.NewRequest("GET", PortainerURL + "/api/stacks", nil)
+	if err != nil { panic(err) }
+
+	req.Header = http.Header{
+		"Authorization": []string{"Bearer " + PortainerJWT},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil { panic(err) }
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil { panic(err) }
+	
+	log.Println("stacksList: " + string(body))
+}
+
 func getRandomPort() int { //Returns an (unused) random port from [1024, 65536)
 	for {
 		port := rand.Intn(65536 - 1024) + 1024
@@ -511,6 +609,7 @@ func main() {
 	UsedPorts[8000] = true //Portainer
 	UsedPorts[9443] = true //Portainer
 	UsedPorts[3306] = true //Runner DB
+	UsedPorts[22] = true //SSH
 	
 	MySQLIP = ""
 	MySQLUsername = ""
