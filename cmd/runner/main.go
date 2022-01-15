@@ -77,7 +77,7 @@ var MySQLPassword string = ""
 var PortainerURL string = ""
 var PortainerUsername string = ""
 var PortainerPassword string = ""
-var PortainerJWT string
+var PortainerJWT string = getPortainerJWT()
 
 //
 // Worker Threads
@@ -105,7 +105,7 @@ func NewWorker(interval time.Duration) *Worker {
 
 // Run starts the worker and listens for a shutdown call.
 func (w *Worker) Run() {
-	log.Println("Worker Started")
+	info("Worker Started")
 	// Loop that runs forever
 	for {
 		select {
@@ -137,7 +137,7 @@ func (w *Worker) Shutdown() {
 // Action defines what the worker does; override this. 
 // For now we'll just wait two seconds and print to simulate work.
 func (w *Worker) Action() {
-	log.Println("Current Instances:")
+	info("Current Instances:")
 	it := InstanceQueue.Iterator()
 	for it.Next() { //Sorted by time
 		timestamp, InstanceId := it.Key().(int64), it.Value().(int)
@@ -170,8 +170,7 @@ func (w *Worker) Action() {
 			
 			break //Only handle 1 instance a time to prevent tree iterator nonsense
 		}
-		log.Println(timestamp)
-		log.Println(InstanceId)
+		info(timestamp, ":", InstanceId)
 	}
 }
 
@@ -198,6 +197,18 @@ func doesFileExist(dir string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+func debug(s ...interface{}) {
+	log.Println("[DEBUG]", s)
+}
+
+func info(s ...interface{}) {
+	log.Println("[INFO]", s)
+}
+
+func warn(s ...interface{}) {
+	log.Println("[WARN]", s)
 }
 
 //
@@ -355,7 +366,7 @@ func syncChallenges() {
 			Challenges[idx].ChallengeId = id //Replace with ChallengeId in DB
 			ChallengeIDMap[id] = idx
 		} else {
-			log.Println("Warning: Challenge", name, "exists in DB but is not in use!")
+			warn("Challenge", name, "exists in DB but is not in use!")
 		}
 	}
 	
@@ -368,7 +379,7 @@ func syncChallenges() {
 	defer stmt1b.Close()
 	
 	for k, v := range new_challenge_names { //Insert new challenges
-		log.Println("N", k, v)
+		debug("New Challenge:", k, ",", v)
 		
 		ch := Challenges[v]
 		_, err = stmt1.Exec(k, ch.DockerCompose, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile)
@@ -385,7 +396,7 @@ func syncChallenges() {
 	defer stmt2.Close()
 	
 	for i, name := range edit_challenge_names { //Edit pre-existing challenges
-		log.Println("E", i, name)
+		debug("Edit Challenge:", i, ",", name)
 		
 		ch := Challenges[ChallengeNamesMap[name]]
 		_, err = stmt2.Exec(ch.DockerCompose, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile, edit_challenge_ids[i])
@@ -430,20 +441,22 @@ func syncInstances() {
 }
 
 func syncWithDB() {
-	fmt.Println("Starting DB Sync...")
+	info("Starting DB Sync...")
 	loadChallengeFiles()
 	syncChallenges()
-	fmt.Println(Challenges)
-	fmt.Println(ChallengeIDMap)
+	debug("Challenge Data:", Challenges)
+	debug("Challenge ID Map:", ChallengeIDMap)
 	syncInstances()
-	fmt.Println("DB Sync Complete!")
+	info("DB Sync Complete!")
 }
 
 //
 // Portainer API
 //
 
-func getPortainerJWT() {
+func getPortainerJWT() string {
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //TODO: Remove
+
 	requestBody, err := json.Marshal(map[string]string {
 		"Username": PortainerUsername,
 		"Password": PortainerPassword,
@@ -460,7 +473,7 @@ func getPortainerJWT() {
 	var raw map[string]string
 	if err := json.Unmarshal(body, &raw); err != nil { panic(err) }
 	
-	PortainerJWT = raw["jwt"]
+	return raw["jwt"]
 }
 
 func getEndpoints() {
@@ -478,7 +491,7 @@ func getEndpoints() {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println("getEndpoints: " + string(body))
+	info("getEndpoints", string(body))
 }
 
 func launchContainer(container_name string, image_name string, cmds []string, internal_port string, _external_port int) string {
@@ -493,7 +506,7 @@ func launchContainer(container_name string, image_name string, cmds []string, in
 	}
 	
 	tmp := "{\"Cmd\":[" + cmd + "],\"Image\":\"" + image_name + "\",\"ExposedPorts\":{\"" + internal_port + "/tcp\":{}},\"HostConfig\":{\"PortBindings\":{\"" + internal_port + "/tcp\":[{\"HostPort\":\"" + external_port + "\"}]}}}"
-	log.Println(tmp)
+	debug("launchContainer Body:", tmp)
 	
 	requestBody := []byte(tmp)
 
@@ -510,7 +523,7 @@ func launchContainer(container_name string, image_name string, cmds []string, in
 	if err != nil { panic(err) }
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
-	log.Println(string(body))
+	debug("launchContainer Response:", string(body))
 	
 	var raw map[string]interface{}
 	if err := json.Unmarshal(body, &raw); err != nil { panic(err) }
@@ -535,7 +548,7 @@ func containersList(){
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println("containersList: " + string(body))
+	info("containersList", string(body))
 }
 
 func startContainer(id string) {
@@ -554,7 +567,7 @@ func startContainer(id string) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println("startContainer: " + string(body))
+	info("startContainer", string(body))
 }
 
 func deleteContainer(id string) {
@@ -571,7 +584,7 @@ func deleteContainer(id string) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println("deleteContainer: " + string(body))
+	info("deleteContainer", string(body))
 }
 
 func launchStack(stack_name string, docker_compose string) string {
@@ -579,7 +592,7 @@ func launchStack(stack_name string, docker_compose string) string {
 	if err != nil { panic(err) }
 	
 	tmp := "{\"name\":\"" + stack_name + "_" + strconv.FormatInt(time.Now().Unix(), 10) + "\",\"stackFileContent\":" + string(json_docker_compose) + "}"
-	log.Println(tmp)
+	debug("launchStack Body:", tmp)
 
 	requestBody := []byte(tmp)
 
@@ -596,7 +609,7 @@ func launchStack(stack_name string, docker_compose string) string {
 	if err != nil { panic(err) }
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
-	log.Println(string(body))
+	debug("launchStack Response:", string(body))
 	
 	var raw map[string]interface{}
 	if err := json.Unmarshal(body, &raw); err != nil { panic(err) }
@@ -619,7 +632,7 @@ func deleteStack(id string) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println("deleteStack: " + string(body))
+	info("deleteStack", string(body))
 }
 
 func stacksList(){
@@ -636,7 +649,7 @@ func stacksList(){
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil { panic(err) }
 	
-	log.Println("stacksList: " + string(body))
+	info("stacksList", string(body))
 }
 
 func getRandomPort() int { //Returns an (unused) random port from [1024, 65536)
@@ -660,7 +673,6 @@ func handleRequests() {
 	log.Fatal(http.ListenAndServe(":10000", nil))
 }
 
-//fmt.Println() - console
 //fmt.Fprintf() - print to web
 
 func validateUserid(userid int) bool {
@@ -729,7 +741,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 		PortainerId = launchContainer(ch.ChallengeName, ch.ImageName, ch.DockerCmds, ch.InternalPort, external_port)
 	}
 	
-	fmt.Println(PortainerId)
+	debug("Portainer ID:", PortainerId)
 	
 	InstanceTimeLeft := time.Now().Unix() + DefaultSecondsPerInstance
 	InstanceMap[InstanceId] = InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, PortainerId: PortainerId, Ports: Ports}
@@ -828,9 +840,6 @@ func main() {
 	
 	syncWithDB()
 	
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //todo remove
-	
-	getPortainerJWT()
 	getEndpoints()
 	containersList()
 	
