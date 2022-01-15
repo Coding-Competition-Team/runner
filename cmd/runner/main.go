@@ -12,6 +12,8 @@ import (
 	"math/rand"
 	"crypto/tls"
 	"strings"
+	"os"
+	"errors"
 )
 
 import (
@@ -22,6 +24,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+//
+// Structs
+//
+
 type InstanceData struct {
 	UserId int
 	InstanceTimeLeft int64 //Unix Timestamp of Instance Timeout
@@ -29,26 +35,45 @@ type InstanceData struct {
 	Ports []int
 }
 
+type Challenge struct {
+	ChallengeName string
+	DockerCompose bool
+	
+	//For DockerCompose = false:
+	InternalPort string
+	ImageName string
+	DockerCmds []string
+	
+	//For DockerCompose = true:
+	DockerComposeFile string
+}
+
 //
 // Global Variables
 //
 
-var ActiveUserInstance map[int]int //UserId -> InstanceId
-var InstanceMap map[int]InstanceData //InstanceId -> InstanceData
-var InstanceQueue *treebidimap.Map //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
-var UsedPorts map[int]bool
+var ActiveUserInstance map[int]int = make(map[int]int) //UserId -> InstanceId
+var InstanceMap map[int]InstanceData = make(map[int]InstanceData) //InstanceId -> InstanceData
+var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator) //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
+var UsedPorts map[int]bool = make(map[int]bool)
 
-var NextInstanceId int
-var DefaultSecondsPerInstance int64
-var DefaultNanosecondsPerInstance int64
+var NextInstanceId int = 1
+var DefaultSecondsPerInstance int64 = 60
+var DefaultNanosecondsPerInstance int64 = DefaultSecondsPerInstance * 1e9
 
-var MySQLIP string
-var MySQLUsername string
-var MySQLPassword string
+var Challenges []Challenge
+var ChallengeNamesMap map[string]int = make(map[string]int) //Challenge Name -> Challenges Index
 
-var PortainerURL string
-var PortainerUsername string
-var PortainerPassword string
+var ChallDataFolder string = "CTF Challenge Data"
+var PS string = "/"
+
+var MySQLIP string = ""
+var MySQLUsername string = ""
+var MySQLPassword string = ""
+
+var PortainerURL string = ""
+var PortainerUsername string = ""
+var PortainerPassword string = ""
 var PortainerJWT string
 
 //
@@ -143,6 +168,31 @@ func (w *Worker) Action() {
 }
 
 //
+// IO Stuff
+//
+
+func getFileNames(dir string) []string {
+	file, err := os.Open(dir)
+	if err != nil { panic(err) }
+	defer file.Close()
+
+	lst, err := file.Readdirnames(0) //Read folders and files
+	if err != nil { panic(err) }
+    
+	return lst
+}
+
+func doesFileExist(dir string) (bool, error) {
+	_, err := os.Stat(dir)
+	if err == nil {
+		return true, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
+
+//
 // YAML API
 //
 
@@ -181,27 +231,131 @@ func dockerComposeCopy(docker_compose string) (string, []int) {
 // MySQL API
 //
 
-func deserialize(str string) []string {
-	return strings.Split(str, ",")
+func deserialize(str string, delim string) []string {
+	return strings.Split(str, delim)
 }
 
-func serialize(dat []int) string {
+func serialize(dat []string, delim string) string {
 	str := ""
 	for i, v := range dat {
-		str += strconv.Itoa(v)
+		str += v
 		if (i + 1) < len(dat) {
-			str += ","
+			str += delim
 		}
 	}
 	return str
 }
 
-func syncWithDB() {
+func loadChallenge(ctf_name string, challenge_name string) {
+	path := ChallDataFolder + PS + ctf_name + PS + challenge_name
+	
+	docker_compose, err := doesFileExist(path + PS + "docker-compose.yml")
+	if err != nil { panic(err) }
+	
+	if docker_compose {
+		docker_compose_file, err := os.ReadFile(path + PS + "docker-compose.yml")
+		if err != nil { panic(err) }
+		
+		Challenges = append(Challenges, Challenge{ChallengeName: challenge_name, DockerCompose: docker_compose, DockerComposeFile: string(docker_compose_file)})
+	} else {
+		internal_port, err := os.ReadFile(path + PS + "PORT.txt")
+		if err != nil { panic(err) }
+		
+		image_name, err := os.ReadFile(path + PS + "IMAGE.txt")
+		if err != nil { panic(err) }
+		
+		docker_cmds, err := os.ReadFile(path + PS + "CMDS.txt")
+		if err != nil { panic(err) }
+		
+		Challenges = append(Challenges, Challenge{ChallengeName: challenge_name, DockerCompose: docker_compose, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserialize(string(docker_cmds), "\n")})
+	}
+	
+	ChallengeNamesMap[challenge_name] = len(Challenges) - 1 //Current index of most recently appended challenge
+}
+
+func loadCTF(ctf_name string) {
+	path := ChallDataFolder + PS + ctf_name
+	
+	lst := getFileNames(path)
+	for _, name := range lst {
+		loadChallenge(ctf_name, name)
+	}
+}
+
+func loadChallengeFiles() {
+	lst := getFileNames(ChallDataFolder)
+	for _, name := range lst {
+		loadCTF(name)
+	}
+}
+
+func syncChallenges() {
+	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
+	if err != nil { panic(err) }
+	defer db.Close()
+	
+	rows, err := db.Query("SELECT challenge_id, challenge_name FROM challenges") //Get currently registered challenges in the DB
+	if err != nil { panic(err) }
+	defer rows.Close()
+
+	var challenge_ids []int
+	var challenge_names []string //Assumes no duplicate challenge names
+
+	for rows.Next() {
+		var challenge_id int
+		var challenge_name string
+		if err := rows.Scan(&challenge_id, &challenge_name); err != nil { panic(err) }
+		
+		challenge_ids = append(challenge_ids, challenge_id)
+		challenge_names = append(challenge_names, challenge_name)
+	}
+	
+	new_challenge_names := ChallengeNamesMap
+	var edit_challenge_ids []int
+	var edit_challenge_names []string
+	
+	for i, name := range challenge_names {
+		_, ok := new_challenge_names[name]
+		if ok { //Ignore challenge names that already exist
+			delete(new_challenge_names, name)
+			edit_challenge_names = append(edit_challenge_names, name)
+			edit_challenge_ids = append(edit_challenge_ids, challenge_ids[i])
+		} else {
+			log.Println("Warning: Challenge", name, "exists in DB but is not in use!")
+		}
+	}
+	
+	stmt1, err := db.Prepare("INSERT INTO challenges (challenge_name, docker_compose, internal_port, image_name, docker_cmds, docker_compose_file) VALUES(?, ?, ?, ?, ?, ?)")
+	if err != nil { panic(err) }
+	defer stmt1.Close()
+	
+	for k, v := range new_challenge_names { //Insert new challenges
+		log.Println("N", k, v)
+		
+		ch := Challenges[v]
+		_, err = stmt1.Exec(k, ch.DockerCompose, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile)
+		if err != nil { panic(err) }
+	}
+	
+	stmt2, err := db.Prepare("UPDATE challenges SET docker_compose = ?, internal_port = ?, image_name = ?, docker_cmds = ?, docker_compose_file = ? WHERE challenge_id = ?")
+	if err != nil { panic(err) }
+	defer stmt2.Close()
+	
+	for i, name := range edit_challenge_names { //Edit pre-existing challenges
+		log.Println("E", i, name)
+		
+		ch := Challenges[ChallengeNamesMap[name]]
+		_, err = stmt2.Exec(ch.DockerCompose, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile, edit_challenge_ids[i])
+		if err != nil { panic(err) }
+	}
+}
+
+func syncInstances() {
 	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
 	if err != nil { panic(err) }
 	defer db.Close()
 
-	rows, err := db.Query("SELECT * FROM instances")
+	rows, err := db.Query("SELECT * FROM instances") //Fully trust DB
 	if err != nil { panic(err) }
 	defer rows.Close()
 
@@ -220,7 +374,7 @@ func syncWithDB() {
 		InstanceQueue.Put(instance_timeout, instance_id)
 		
 		var ports []int
-		deserialized_ports := deserialize(ports_used)
+		deserialized_ports := deserialize(ports_used, ",")
 		for _, v := range deserialized_ports {
 			port, err := strconv.Atoi(v)
 			if err != nil { panic(err) }
@@ -229,7 +383,12 @@ func syncWithDB() {
 		}
 		InstanceMap[instance_id] = InstanceData{UserId: usr_id, InstanceTimeLeft: instance_timeout, DockerId: docker_id, Ports: ports}
 	}
-	
+}
+
+func syncWithDB() {
+	loadChallengeFiles()
+	syncChallenges()
+	syncInstances()
 	fmt.Println("DB Sync Complete")
 }
 
@@ -519,7 +678,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	if err != nil { panic(err) }
 	defer stmt.Close()
 	
-	serialized_ports := serialize([]int{external_port})
+	serialized_ports := serialize([]string{strconv.Itoa(external_port)}, ",")
 	_, err = stmt.Exec(InstanceId, userid, DockerId, InstanceTimeLeft, serialized_ports)
 	if err != nil { panic(err) }
 }
@@ -597,31 +756,15 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-
-	ActiveUserInstance = make(map[int]int)
-	InstanceMap = make(map[int]InstanceData)
-	NextInstanceId = 1
-	DefaultSecondsPerInstance = 60
-	DefaultNanosecondsPerInstance = DefaultSecondsPerInstance * 1e9
-	InstanceQueue = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator)
-	UsedPorts = make(map[int]bool)
 	
 	UsedPorts[8000] = true //Portainer
 	UsedPorts[9443] = true //Portainer
 	UsedPorts[3306] = true //Runner DB
 	UsedPorts[22] = true //SSH
 	
-	MySQLIP = ""
-	MySQLUsername = ""
-	MySQLPassword = ""
-	
 	syncWithDB()
 	
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //todo remove
-	
-	PortainerURL = ""
-	PortainerUsername = ""
-	PortainerPassword = ""
 	
 	getPortainerJWT()
 	getEndpoints()
