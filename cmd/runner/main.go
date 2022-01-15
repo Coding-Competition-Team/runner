@@ -30,8 +30,9 @@ import (
 
 type InstanceData struct {
 	UserId int
+	ChallengeId int
 	InstanceTimeLeft int64 //Unix Timestamp of Instance Timeout
-	DockerId string
+	PortainerId string
 	Ports []int
 }
 
@@ -152,8 +153,13 @@ func (w *Worker) Action() {
 			_, err = stmt.Exec(InstanceId)
 			if err != nil { panic(err) }
 			
-			DockerId := InstanceMap[InstanceId].DockerId
-			deleteContainer(DockerId)
+			PortainerId := InstanceMap[InstanceId].PortainerId
+			if Challenges[ChallengeIDMap[InstanceMap[InstanceId].ChallengeId]].DockerCompose {
+				deleteStack(PortainerId)
+			} else {
+				deleteContainer(PortainerId)
+			}
+			
 			UserId := InstanceMap[InstanceId].UserId
 			InstanceQueue.Remove(timestamp)
 			for _, v := range InstanceMap[InstanceId].Ports {
@@ -204,7 +210,7 @@ func parseInternalPort(str string) string { //Returns the internal port
 
 func dockerComposeCopy(docker_compose string) (string, []int) {
 	yml := make(map[interface{}]interface{})
-	err := yaml.Unmarshal([]byte(data), &yml)
+	err := yaml.Unmarshal([]byte(docker_compose), &yml)
 	if err != nil { panic(err) }
 	
 	var new_ports []int
@@ -237,10 +243,25 @@ func deserialize(str string, delim string) []string {
 	return strings.Split(str, delim)
 }
 
+func deserializeNL(str string) []string {
+	return strings.Split(strings.ReplaceAll(str, "\r\n", "\n"), "\n")
+}
+
 func serialize(dat []string, delim string) string {
 	str := ""
 	for i, v := range dat {
 		str += v
+		if (i + 1) < len(dat) {
+			str += delim
+		}
+	}
+	return str
+}
+
+func serializeI(dat []int, delim string) string {
+	str := ""
+	for i, v := range dat {
+		str += strconv.Itoa(v)
 		if (i + 1) < len(dat) {
 			str += delim
 		}
@@ -269,7 +290,7 @@ func loadChallenge(ctf_name string, challenge_name string) {
 		docker_cmds, err := os.ReadFile(path + PS + "CMDS.txt")
 		if err != nil { panic(err) }
 		
-		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserialize(string(docker_cmds), "\n")})
+		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserializeNL(string(docker_cmds))})
 	}
 	
 	ChallengeNamesMap[challenge_name] = len(Challenges) - 1 //Current index of most recently appended challenge
@@ -384,10 +405,11 @@ func syncInstances() {
 	for rows.Next() {
 		var instance_id int
 		var usr_id int
-		var docker_id string
+		var challenge_id int
+		var portainer_id string
 		var instance_timeout int64
 		var ports_used string
-		if err := rows.Scan(&instance_id, &usr_id, &docker_id, &instance_timeout, &ports_used); err != nil { panic(err) }
+		if err := rows.Scan(&instance_id, &usr_id, &challenge_id, &portainer_id, &instance_timeout, &ports_used); err != nil { panic(err) }
 		
 		if (instance_id + 1) > NextInstanceId {
 			NextInstanceId = instance_id + 1
@@ -403,17 +425,18 @@ func syncInstances() {
 			ports = append(ports, port)
 			UsedPorts[port] = true
 		}
-		InstanceMap[instance_id] = InstanceData{UserId: usr_id, InstanceTimeLeft: instance_timeout, DockerId: docker_id, Ports: ports}
+		InstanceMap[instance_id] = InstanceData{UserId: usr_id, ChallengeId: challenge_id, InstanceTimeLeft: instance_timeout, PortainerId: portainer_id, Ports: ports}
 	}
 }
 
 func syncWithDB() {
+	fmt.Println("Starting DB Sync...")
 	loadChallengeFiles()
 	syncChallenges()
 	fmt.Println(Challenges)
 	fmt.Println(ChallengeIDMap)
 	syncInstances()
-	fmt.Println("DB Sync Complete")
+	fmt.Println("DB Sync Complete!")
 }
 
 //
@@ -458,8 +481,7 @@ func getEndpoints() {
 	log.Println("getEndpoints: " + string(body))
 }
 
-func launchContainer(container_name string, image_name string, cmds []string, _internal_port int, _external_port int) string {
-	internal_port := strconv.Itoa(_internal_port)
+func launchContainer(container_name string, image_name string, cmds []string, internal_port string, _external_port int) string {
 	external_port := strconv.Itoa(_external_port)
 	
 	cmd := ""
@@ -476,7 +498,7 @@ func launchContainer(container_name string, image_name string, cmds []string, _i
 	requestBody := []byte(tmp)
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", PortainerURL + "/api/endpoints/2/docker/containers/create?name=" + container_name + "_" + external_port, bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest("POST", PortainerURL + "/api/endpoints/2/docker/containers/create?name=" + container_name + "_" + strconv.FormatInt(time.Now().Unix(), 10), bytes.NewBuffer(requestBody))
 	if err != nil { panic(err) }
 
 	req.Header = http.Header{
@@ -556,7 +578,7 @@ func launchStack(stack_name string, docker_compose string) string {
 	json_docker_compose, err := json.Marshal(docker_compose) //Make sure docker_compose is JSON Encoded
 	if err != nil { panic(err) }
 	
-	tmp := "{\"name\":\"" + stack_name + "\",\"stackFileContent\":" + string(json_docker_compose) + "}"
+	tmp := "{\"name\":\"" + stack_name + "_" + strconv.FormatInt(time.Now().Unix(), 10) + "\",\"stackFileContent\":" + string(json_docker_compose) + "}"
 	log.Println(tmp)
 
 	requestBody := []byte(tmp)
@@ -684,27 +706,44 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	
 	InstanceId := NextInstanceId	
 	NextInstanceId++
-	
 	ActiveUserInstance[userid] = InstanceId
 	InstanceQueue.Put(time.Now().UnixNano() + DefaultNanosecondsPerInstance, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
-	external_port := getRandomPort()
-	fmt.Fprintf(w, strconv.Itoa(external_port))
 	
-	DockerId := launchContainer("nginx", "nginx:latest", []string{"nginx", "-g", "daemon off;"}, 80, external_port)
-	fmt.Println(DockerId)
+	var PortainerId string
+	var Ports []int
+	
+	ch := Challenges[ChallengeIDMap[challid]]
+	if ch.DockerCompose {
+		var new_docker_compose string //Declare this so as to avoid := dockerComposeCopy()
+		new_docker_compose, Ports = dockerComposeCopy(ch.DockerComposeFile)
+		for _, port := range Ports {
+			fmt.Fprintln(w, strconv.Itoa(port))
+		}
+		
+		PortainerId = launchStack(ch.ChallengeName, new_docker_compose)
+	} else {
+		external_port := getRandomPort()
+		fmt.Fprintf(w, strconv.Itoa(external_port))
+		
+		Ports = []int{external_port}
+		PortainerId = launchContainer(ch.ChallengeName, ch.ImageName, ch.DockerCmds, ch.InternalPort, external_port)
+	}
+	
+	fmt.Println(PortainerId)
+	
 	InstanceTimeLeft := time.Now().Unix() + DefaultSecondsPerInstance
-	InstanceMap[InstanceId] = InstanceData{UserId: userid, InstanceTimeLeft: InstanceTimeLeft, DockerId: DockerId, Ports: []int{external_port}}
+	InstanceMap[InstanceId] = InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, PortainerId: PortainerId, Ports: Ports}
 	
 	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
 	if err != nil { panic(err) }
 	defer db.Close()
 	
-	stmt, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, docker_id, instance_timeout, ports_used) VALUES(?, ?, ?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, challenge_id, portainer_id, instance_timeout, ports_used) VALUES(?, ?, ?, ?, ?, ?)")
 	if err != nil { panic(err) }
 	defer stmt.Close()
 	
-	serialized_ports := serialize([]string{strconv.Itoa(external_port)}, ",")
-	_, err = stmt.Exec(InstanceId, userid, DockerId, InstanceTimeLeft, serialized_ports)
+	serialized_ports := serializeI(Ports, ",")
+	_, err = stmt.Exec(InstanceId, userid, challid, PortainerId, InstanceTimeLeft, serialized_ports)
 	if err != nil { panic(err) }
 }
 
