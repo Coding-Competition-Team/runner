@@ -36,6 +36,7 @@ type InstanceData struct {
 }
 
 type Challenge struct {
+	ChallengeId int //Defaults to -1 (Unknown ChallengeId)
 	ChallengeName string
 	DockerCompose bool
 	
@@ -62,7 +63,8 @@ var DefaultSecondsPerInstance int64 = 60
 var DefaultNanosecondsPerInstance int64 = DefaultSecondsPerInstance * 1e9
 
 var Challenges []Challenge
-var ChallengeNamesMap map[string]int = make(map[string]int) //Challenge Name -> Challenges Index
+var ChallengeNamesMap map[string]int = make(map[string]int) //Challenge Name -> Challenges Array Index
+var ChallengeIDMap map[int]int = make(map[int]int) //Challenge ID -> Challenges Array Index
 
 var ChallDataFolder string = "CTF Challenge Data"
 var PS string = "/"
@@ -256,7 +258,7 @@ func loadChallenge(ctf_name string, challenge_name string) {
 		docker_compose_file, err := os.ReadFile(path + PS + "docker-compose.yml")
 		if err != nil { panic(err) }
 		
-		Challenges = append(Challenges, Challenge{ChallengeName: challenge_name, DockerCompose: docker_compose, DockerComposeFile: string(docker_compose_file)})
+		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, DockerComposeFile: string(docker_compose_file)})
 	} else {
 		internal_port, err := os.ReadFile(path + PS + "PORT.txt")
 		if err != nil { panic(err) }
@@ -267,7 +269,7 @@ func loadChallenge(ctf_name string, challenge_name string) {
 		docker_cmds, err := os.ReadFile(path + PS + "CMDS.txt")
 		if err != nil { panic(err) }
 		
-		Challenges = append(Challenges, Challenge{ChallengeName: challenge_name, DockerCompose: docker_compose, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserialize(string(docker_cmds), "\n")})
+		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserialize(string(docker_cmds), "\n")})
 	}
 	
 	ChallengeNamesMap[challenge_name] = len(Challenges) - 1 //Current index of most recently appended challenge
@@ -310,16 +312,27 @@ func syncChallenges() {
 		challenge_names = append(challenge_names, challenge_name)
 	}
 	
-	new_challenge_names := ChallengeNamesMap
+	var new_challenge_names map[string]int = make(map[string]int) //TODO: Better way to do a deepcopy?
+	jsonStr, err := json.Marshal(ChallengeNamesMap)
+	if err != nil { panic(err) }
+	err = json.Unmarshal(jsonStr, &new_challenge_names)
+	if err != nil { panic(err) }
+	
 	var edit_challenge_ids []int
 	var edit_challenge_names []string
 	
 	for i, name := range challenge_names {
 		_, ok := new_challenge_names[name]
-		if ok { //Ignore challenge names that already exist
+		if ok { //Challenge name already exists in DB
+			id := challenge_ids[i]
+			idx := ChallengeNamesMap[name]
+		
 			delete(new_challenge_names, name)
 			edit_challenge_names = append(edit_challenge_names, name)
-			edit_challenge_ids = append(edit_challenge_ids, challenge_ids[i])
+			edit_challenge_ids = append(edit_challenge_ids, id)
+			
+			Challenges[idx].ChallengeId = id //Replace with ChallengeId in DB
+			ChallengeIDMap[id] = idx
 		} else {
 			log.Println("Warning: Challenge", name, "exists in DB but is not in use!")
 		}
@@ -329,12 +342,21 @@ func syncChallenges() {
 	if err != nil { panic(err) }
 	defer stmt1.Close()
 	
+	stmt1b, err := db.Prepare("SELECT challenge_id FROM challenges WHERE challenge_name = ?")
+	if err != nil { panic(err) }
+	defer stmt1b.Close()
+	
 	for k, v := range new_challenge_names { //Insert new challenges
 		log.Println("N", k, v)
 		
 		ch := Challenges[v]
 		_, err = stmt1.Exec(k, ch.DockerCompose, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile)
 		if err != nil { panic(err) }
+		
+		var challenge_id int
+		if err := stmt1b.QueryRow(k).Scan(&challenge_id); err != nil { panic(err) }
+		Challenges[v].ChallengeId = challenge_id //Get DB assigned challenge id
+		ChallengeIDMap[challenge_id] = v
 	}
 	
 	stmt2, err := db.Prepare("UPDATE challenges SET docker_compose = ?, internal_port = ?, image_name = ?, docker_cmds = ?, docker_compose_file = ? WHERE challenge_id = ?")
@@ -388,6 +410,8 @@ func syncInstances() {
 func syncWithDB() {
 	loadChallengeFiles()
 	syncChallenges()
+	fmt.Println(Challenges)
+	fmt.Println(ChallengeIDMap)
 	syncInstances()
 	fmt.Println("DB Sync Complete")
 }
@@ -622,7 +646,8 @@ func validateUserid(userid int) bool {
 }
 
 func validateChallid(challid int) bool {
-	return true
+	_, ok := ChallengeIDMap[challid]
+	return ok
 }
 
 func addInstance(w http.ResponseWriter, r *http.Request){
