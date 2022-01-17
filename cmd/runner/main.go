@@ -60,7 +60,7 @@ var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, 
 var UsedPorts map[int]bool = make(map[int]bool)
 
 var NextInstanceId int = 1
-var DefaultSecondsPerInstance int64 = 60
+var DefaultSecondsPerInstance int64 = 300
 var DefaultNanosecondsPerInstance int64 = DefaultSecondsPerInstance * 1e9
 
 var Challenges []Challenge
@@ -237,6 +237,11 @@ func dockerComposeCopy(docker_compose string) (string, []int) {
 				new_ports = append(new_ports, external_port)
 			}
 			yml["services"].(map[interface{}]interface{})[k1].(map[interface{}]interface{})["ports"] = new_port_mappings //Override old port mappings
+		}
+		
+		container_name := v1.(map[interface{}]interface{})["container_name"]
+		if container_name != nil { //There is a container name
+			delete(yml["services"].(map[interface{}]interface{})[k1].(map[interface{}]interface{}), "container_name") //Clear container name, let portainer substitute from stack name instead to prevent duplicate container names
 		}
 	}
 	
@@ -494,7 +499,7 @@ func getEndpoints() {
 	info("getEndpoints", string(body))
 }
 
-func launchContainer(container_name string, image_name string, cmds []string, internal_port string, _external_port int) string {
+func launchContainer(container_name string, image_name string, cmds []string, internal_port string, _external_port int, discriminant string) string {
 	external_port := strconv.Itoa(_external_port)
 	
 	cmd := ""
@@ -511,7 +516,7 @@ func launchContainer(container_name string, image_name string, cmds []string, in
 	requestBody := []byte(tmp)
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", PortainerURL + "/api/endpoints/2/docker/containers/create?name=" + container_name + "_" + strconv.FormatInt(time.Now().Unix(), 10), bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest("POST", PortainerURL + "/api/endpoints/2/docker/containers/create?name=" + container_name + "_" + discriminant, bytes.NewBuffer(requestBody))
 	if err != nil { panic(err) }
 
 	req.Header = http.Header{
@@ -587,11 +592,11 @@ func deleteContainer(id string) {
 	info("deleteContainer", string(body))
 }
 
-func launchStack(stack_name string, docker_compose string) string {
+func launchStack(stack_name string, docker_compose string, discriminant string) string {
 	json_docker_compose, err := json.Marshal(docker_compose) //Make sure docker_compose is JSON Encoded
 	if err != nil { panic(err) }
 	
-	tmp := "{\"name\":\"" + stack_name + "_" + strconv.FormatInt(time.Now().Unix(), 10) + "\",\"stackFileContent\":" + string(json_docker_compose) + "}"
+	tmp := "{\"name\":\"" + stack_name + "_" + discriminant + "\",\"stackFileContent\":" + string(json_docker_compose) + "}"
 	debug("launchStack Body:", tmp)
 
 	requestBody := []byte(tmp)
@@ -720,6 +725,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	NextInstanceId++
 	ActiveUserInstance[userid] = InstanceId
 	InstanceQueue.Put(time.Now().UnixNano() + DefaultNanosecondsPerInstance, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
+	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
 	
 	var PortainerId string
 	var Ports []int
@@ -732,13 +738,13 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 			fmt.Fprintln(w, strconv.Itoa(port))
 		}
 		
-		PortainerId = launchStack(ch.ChallengeName, new_docker_compose)
+		PortainerId = launchStack(ch.ChallengeName, new_docker_compose, discriminant)
 	} else {
 		external_port := getRandomPort()
 		fmt.Fprintf(w, strconv.Itoa(external_port))
 		
 		Ports = []int{external_port}
-		PortainerId = launchContainer(ch.ChallengeName, ch.ImageName, ch.DockerCmds, ch.InternalPort, external_port)
+		PortainerId = launchContainer(ch.ChallengeName, ch.ImageName, ch.DockerCmds, ch.InternalPort, external_port, discriminant)
 	}
 	
 	debug("Portainer ID:", PortainerId)
