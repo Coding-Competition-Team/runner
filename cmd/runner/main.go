@@ -139,9 +139,11 @@ func (w *Worker) Shutdown() {
 func (w *Worker) Action() {
 	info("Current Instances:")
 	it := InstanceQueue.Iterator()
+	current_timestamp := time.Now().UnixNano()
+	
 	for it.Next() { //Sorted by time
 		timestamp, InstanceId := it.Key().(int64), it.Value().(int)
-		if timestamp <= time.Now().UnixNano() {
+		if timestamp <= current_timestamp {
 			db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
 			if err != nil { panic(err) }
 			defer db.Close()
@@ -725,7 +727,8 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	InstanceId := NextInstanceId	
 	NextInstanceId++
 	ActiveUserInstance[userid] = InstanceId
-	InstanceQueue.Put(time.Now().UnixNano() + DefaultNanosecondsPerInstance, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
+	InstanceTimeLeft := time.Now().UnixNano() + DefaultNanosecondsPerInstance
+	InstanceQueue.Put(InstanceTimeLeft, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
 	
 	var PortainerId string
@@ -750,7 +753,6 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	
 	debug("Portainer ID:", PortainerId)
 	
-	InstanceTimeLeft := time.Now().UnixNano() + DefaultNanosecondsPerInstance
 	InstanceMap[InstanceId] = InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, PortainerId: PortainerId, Ports: Ports}
 	
 	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
