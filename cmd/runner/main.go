@@ -31,7 +31,7 @@ import (
 type InstanceData struct {
 	UserId int
 	ChallengeId int
-	InstanceTimeLeft int64 //Unix Timestamp of Instance Timeout
+	InstanceTimeLeft int64 //Unix (Nano) Timestamp of Instance Timeout
 	PortainerId string
 	Ports []int
 }
@@ -452,6 +452,7 @@ func syncWithDB() {
 	debug("Challenge Data:", Challenges)
 	debug("Challenge ID Map:", ChallengeIDMap)
 	syncInstances()
+	debug("Instance Map:", InstanceMap)
 	info("DB Sync Complete!")
 }
 
@@ -749,7 +750,7 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	
 	debug("Portainer ID:", PortainerId)
 	
-	InstanceTimeLeft := time.Now().Unix() + DefaultSecondsPerInstance
+	InstanceTimeLeft := time.Now().UnixNano() + DefaultNanosecondsPerInstance
 	InstanceMap[InstanceId] = InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, PortainerId: PortainerId, Ports: Ports}
 	
 	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
@@ -787,7 +788,7 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request){
 	
 	InstanceId := ActiveUserInstance[userid]
 	
-	fmt.Fprintf(w, strconv.FormatInt(InstanceMap[InstanceId].InstanceTimeLeft - time.Now().Unix(), 10))
+	fmt.Fprintf(w, strconv.FormatInt((InstanceMap[InstanceId].InstanceTimeLeft - time.Now().UnixNano()) / 1e9, 10))
 }
 
 func extendTimeLeft(w http.ResponseWriter, r *http.Request){
@@ -811,16 +812,16 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 	}
 	
 	InstanceId := ActiveUserInstance[userid]
-	if entry, ok := InstanceMap[InstanceId]; !ok { panic(err) } else {
-		entry.InstanceTimeLeft += DefaultSecondsPerInstance
-		InstanceMap[InstanceId] = entry
-	}
+	entry := InstanceMap[InstanceId]
+	
+	NewInstanceTimeLeft := entry.InstanceTimeLeft + DefaultNanosecondsPerInstance
+	entry.InstanceTimeLeft = NewInstanceTimeLeft
+	InstanceMap[InstanceId] = entry
 	
 	a, b := InstanceQueue.GetKey(InstanceId)
-	if b == false {
-		panic("InstanceId missing")
+	if !b {
+		panic("InstanceId is missing in InstanceQueue!")
 	}
-	NewInstanceTimeLeft := a.(int64) + DefaultNanosecondsPerInstance
 	InstanceQueue.Remove(a)
 	InstanceQueue.Put(NewInstanceTimeLeft, InstanceId) //Replace
 	
