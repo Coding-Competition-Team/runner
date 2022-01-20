@@ -60,6 +60,7 @@ var InstanceMap map[int]InstanceData = make(map[int]InstanceData) //InstanceId -
 var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator) //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
 var UsedPorts map[int]bool = make(map[int]bool)
 
+var MaxInstanceCount int = 3
 var NextInstanceId int = 1
 var DefaultSecondsPerInstance int64 = 300
 var DefaultNanosecondsPerInstance int64 = DefaultSecondsPerInstance * 1e9
@@ -738,6 +739,11 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	
 	if ActiveUserInstance[userid] > 0 {
 		http.Error(w, "User is already running an instance", http.StatusForbidden)
+		return
+	}
+	
+	if len(InstanceMap) >= MaxInstanceCount { //Use >= instead of == just in case
+		http.Error(w, "The max number of instances for the platform has already been reached, try again later", http.StatusForbidden)
 		return
 	}
 	
