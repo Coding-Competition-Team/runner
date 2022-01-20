@@ -5,6 +5,7 @@ CREATE TABLE challenges (
 	challenge_id int unsigned NOT NULL AUTO_INCREMENT,
 	challenge_name varchar(255) NOT NULL,
 	docker_compose bool NOT NULL,
+	port_count int NOT NULL,
 	internal_port varchar(255),
 	image_name varchar(255),
 	docker_cmds varchar(255),
@@ -15,7 +16,8 @@ CREATE TABLE challenges (
 CREATE TABLE instances (
 	instance_id int unsigned NOT NULL AUTO_INCREMENT,
 	usr_id int unsigned NOT NULL,
-	docker_id varchar(64) NOT NULL,
+	challenge_id int unsigned NOT NULL,
+	portainer_id varchar(64) NOT NULL,
 	instance_timeout bigint unsigned NOT NULL,
 	ports_used varchar(255) NOT NULL,
 	PRIMARY KEY (instance_id)

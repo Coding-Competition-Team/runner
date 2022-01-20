@@ -40,6 +40,7 @@ type Challenge struct {
 	ChallengeId int //Defaults to -1 (Unknown ChallengeId)
 	ChallengeName string
 	DockerCompose bool
+	PortCount int
 	
 	//For DockerCompose = false:
 	InternalPort string
@@ -253,6 +254,22 @@ func dockerComposeCopy(docker_compose string) (string, []int) {
 	return string(new_yml), new_ports
 }
 
+func dockerComposePortCount(docker_compose string) int {
+	yml := make(map[interface{}]interface{})
+	err := yaml.Unmarshal([]byte(docker_compose), &yml)
+	if err != nil { panic(err) }
+	
+	port_count := 0
+	for _, v1 := range yml["services"].(map[interface{}]interface{}) {
+		raw_port_mappings := v1.(map[interface{}]interface{})["ports"]
+		if raw_port_mappings != nil { //There are ports
+			port_count += len(raw_port_mappings.([]interface{}))
+		}
+	}
+	
+	return port_count
+}
+
 //
 // MySQL API
 //
@@ -294,10 +311,12 @@ func loadChallenge(ctf_name string, challenge_name string) {
 	if err != nil { panic(err) }
 	
 	if docker_compose {
-		docker_compose_file, err := os.ReadFile(path + PS + "docker-compose.yml")
+		_docker_compose_file, err := os.ReadFile(path + PS + "docker-compose.yml")
 		if err != nil { panic(err) }
 		
-		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, DockerComposeFile: string(docker_compose_file)})
+		docker_compose_file := string(_docker_compose_file)
+		
+		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: dockerComposePortCount(docker_compose_file), DockerComposeFile: docker_compose_file})
 	} else {
 		internal_port, err := os.ReadFile(path + PS + "PORT.txt")
 		if err != nil { panic(err) }
@@ -308,7 +327,7 @@ func loadChallenge(ctf_name string, challenge_name string) {
 		docker_cmds, err := os.ReadFile(path + PS + "CMDS.txt")
 		if err != nil { panic(err) }
 		
-		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserializeNL(string(docker_cmds))})
+		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: 1, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserializeNL(string(docker_cmds))})
 	}
 	
 	ChallengeNamesMap[challenge_name] = len(Challenges) - 1 //Current index of most recently appended challenge
@@ -377,7 +396,7 @@ func syncChallenges() {
 		}
 	}
 	
-	stmt1, err := db.Prepare("INSERT INTO challenges (challenge_name, docker_compose, internal_port, image_name, docker_cmds, docker_compose_file) VALUES(?, ?, ?, ?, ?, ?)")
+	stmt1, err := db.Prepare("INSERT INTO challenges (challenge_name, docker_compose, port_count, internal_port, image_name, docker_cmds, docker_compose_file) VALUES(?, ?, ?, ?, ?, ?, ?)")
 	if err != nil { panic(err) }
 	defer stmt1.Close()
 	
@@ -389,7 +408,7 @@ func syncChallenges() {
 		debug("New Challenge:", k, ",", v)
 		
 		ch := Challenges[v]
-		_, err = stmt1.Exec(k, ch.DockerCompose, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile)
+		_, err = stmt1.Exec(k, ch.DockerCompose, ch.PortCount, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile)
 		if err != nil { panic(err) }
 		
 		var challenge_id int
@@ -398,7 +417,7 @@ func syncChallenges() {
 		ChallengeIDMap[challenge_id] = v
 	}
 	
-	stmt2, err := db.Prepare("UPDATE challenges SET docker_compose = ?, internal_port = ?, image_name = ?, docker_cmds = ?, docker_compose_file = ? WHERE challenge_id = ?")
+	stmt2, err := db.Prepare("UPDATE challenges SET docker_compose = ?, port_count = ?, internal_port = ?, image_name = ?, docker_cmds = ?, docker_compose_file = ? WHERE challenge_id = ?")
 	if err != nil { panic(err) }
 	defer stmt2.Close()
 	
@@ -406,7 +425,7 @@ func syncChallenges() {
 		debug("Edit Challenge:", i, ",", name)
 		
 		ch := Challenges[ChallengeNamesMap[name]]
-		_, err = stmt2.Exec(ch.DockerCompose, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile, edit_challenge_ids[i])
+		_, err = stmt2.Exec(ch.DockerCompose, ch.PortCount, ch.InternalPort, ch.ImageName, serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile, edit_challenge_ids[i])
 		if err != nil { panic(err) }
 	}
 }
@@ -813,6 +832,10 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	
+	go _extendTimeLeft(userid)
+}
+
+func _extendTimeLeft(userid int) { //Run Async
 	InstanceId := ActiveUserInstance[userid]
 	entry := InstanceMap[InstanceId]
 	
