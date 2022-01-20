@@ -694,6 +694,7 @@ func getRandomPort() int { //Returns an (unused) random port from [1024, 65536)
 
 func handleRequests() {
 	http.HandleFunc("/addInstance", addInstance)
+	http.HandleFunc("/removeInstance", removeInstance)
 	http.HandleFunc("/getTimeLeft", getTimeLeft)
 	http.HandleFunc("/extendTimeLeft", extendTimeLeft)
 	log.Fatal(http.ListenAndServe(":10000", nil))
@@ -801,6 +802,52 @@ func _addInstance(userid int, challid int, Ports []int) { //Run Async
 	
 	_, err = stmt2.Exec(PortainerId, InstanceId)
 	if err != nil { panic(err) }
+}
+
+func removeInstance(w http.ResponseWriter, r *http.Request){
+	params := r.URL.Query()
+	
+	_userid := params["userid"]
+	if len(_userid) == 0 {
+		http.Error(w, "Missing userid", http.StatusForbidden)
+		return
+	}
+	userid, err := strconv.Atoi(_userid[0])
+	if err != nil { panic(err) }
+	if !validateUserid(userid) {
+		http.Error(w, "Invalid userid", http.StatusForbidden)
+		return
+	}
+	
+	if ActiveUserInstance[userid] <= 0 {
+		http.Error(w, "User does not have an instance", http.StatusForbidden)
+		return
+	}
+	
+	InstanceId := ActiveUserInstance[userid]
+	if InstanceMap[InstanceId].PortainerId == "" {
+		http.Error(w, "The instance is still starting", http.StatusForbidden)
+		return
+	}
+	
+	go _removeInstance(InstanceId)
+}
+
+func _removeInstance(InstanceId int) { //Run Async
+	var NewInstanceTimeLeft int64 = 0 //Force typecast
+	
+	entry := InstanceMap[InstanceId]
+	entry.InstanceTimeLeft = NewInstanceTimeLeft //Make sure that the instance will be killed in the next kill cycle
+	InstanceMap[InstanceId] = entry
+	
+	a, b := InstanceQueue.GetKey(InstanceId)
+	if !b {
+		panic("InstanceId is missing in InstanceQueue!")
+	}
+	InstanceQueue.Remove(a)
+	InstanceQueue.Put(NewInstanceTimeLeft, InstanceId) //Replace
+	
+	//No need to update DB since it will be removed anyways...
 }
 
 func getTimeLeft(w http.ResponseWriter, r *http.Request){

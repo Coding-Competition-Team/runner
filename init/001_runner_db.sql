@@ -17,7 +17,7 @@ CREATE TABLE instances (
 	instance_id int unsigned NOT NULL AUTO_INCREMENT,
 	usr_id int unsigned NOT NULL,
 	challenge_id int unsigned NOT NULL,
-	portainer_id varchar(64) NOT NULL,
+	portainer_id varchar(64),
 	instance_timeout bigint unsigned NOT NULL,
 	ports_used varchar(255) NOT NULL,
 	PRIMARY KEY (instance_id)
