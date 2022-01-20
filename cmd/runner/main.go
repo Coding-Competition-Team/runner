@@ -765,6 +765,19 @@ func _addInstance(userid int, challid int, Ports []int) { //Run Async
 	InstanceTimeLeft := time.Now().UnixNano() + DefaultNanosecondsPerInstance
 	InstanceQueue.Put(InstanceTimeLeft, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
+	InstanceMap[InstanceId] = InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, Ports: Ports} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
+	
+	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
+	if err != nil { panic(err) }
+	defer db.Close()
+	
+	stmt1, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, challenge_id, instance_timeout, ports_used) VALUES(?, ?, ?, ?, ?)")
+	if err != nil { panic(err) }
+	defer stmt1.Close()
+	
+	serialized_ports := serializeI(Ports, ",")
+	_, err = stmt1.Exec(InstanceId, userid, challid, InstanceTimeLeft, serialized_ports)
+	if err != nil { panic(err) }
 	
 	var PortainerId string
 	
@@ -778,18 +791,15 @@ func _addInstance(userid int, challid int, Ports []int) { //Run Async
 	
 	debug("Portainer ID:", PortainerId)
 	
-	InstanceMap[InstanceId] = InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, PortainerId: PortainerId, Ports: Ports}
+	entry := InstanceMap[InstanceId]
+	entry.PortainerId = PortainerId
+	InstanceMap[InstanceId] = entry //Update PortainerId once it's available
 	
-	db, err := sql.Open("mysql", MySQLUsername + ":" + MySQLPassword + "@tcp(" + MySQLIP + ")/runner_db")
+	stmt2, err := db.Prepare("UPDATE instances SET portainer_id = ? WHERE instance_id = ?")
 	if err != nil { panic(err) }
-	defer db.Close()
+	defer stmt2.Close()
 	
-	stmt, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, challenge_id, portainer_id, instance_timeout, ports_used) VALUES(?, ?, ?, ?, ?, ?)")
-	if err != nil { panic(err) }
-	defer stmt.Close()
-	
-	serialized_ports := serializeI(Ports, ",")
-	_, err = stmt.Exec(InstanceId, userid, challid, PortainerId, InstanceTimeLeft, serialized_ports)
+	_, err = stmt2.Exec(PortainerId, InstanceId)
 	if err != nil { panic(err) }
 }
 
