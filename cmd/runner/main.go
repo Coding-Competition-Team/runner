@@ -222,22 +222,20 @@ func parseInternalPort(str string) string { //Returns the internal port
 	return strings.Split(str, ":")[1]
 }
 
-func dockerComposeCopy(docker_compose string) (string, []int) {
+func dockerComposeCopy(docker_compose string, ports []int) string {
 	yml := make(map[interface{}]interface{})
 	err := yaml.Unmarshal([]byte(docker_compose), &yml)
 	if err != nil { panic(err) }
 	
-	var new_ports []int
+	ports_idx := 0
 	for k1, v1 := range yml["services"].(map[interface{}]interface{}) {
 		raw_port_mappings := v1.(map[interface{}]interface{})["ports"]
 		if raw_port_mappings != nil { //There are ports
 			raw_port_mappings := raw_port_mappings.([]interface{})
 			new_port_mappings := make([]string, len(raw_port_mappings))
 			for k2, v2 := range raw_port_mappings {
-				internal_port := parseInternalPort(v2.(string))
-				external_port := getRandomPort()
-				new_port_mappings[k2] = strconv.Itoa(external_port) + ":" + internal_port
-				new_ports = append(new_ports, external_port)
+				new_port_mappings[k2] = strconv.Itoa(ports[ports_idx]) + ":" + parseInternalPort(v2.(string))
+				ports_idx += 1
 			}
 			yml["services"].(map[interface{}]interface{})[k1].(map[interface{}]interface{})["ports"] = new_port_mappings //Override old port mappings
 		}
@@ -251,7 +249,7 @@ func dockerComposeCopy(docker_compose string) (string, []int) {
 	new_yml, err := yaml.Marshal(&yml)
 	if err != nil { panic(err) }
 	
-	return string(new_yml), new_ports
+	return string(new_yml)
 }
 
 func dockerComposePortCount(docker_compose string) int {
@@ -743,6 +741,18 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	
+	ch := Challenges[ChallengeIDMap[challid]]
+	
+	Ports := make([]int, ch.PortCount) //Cannot directly use [ch.PortCount]int
+	for i := 0; i < ch.PortCount; i++ {
+		Ports[i] = getRandomPort()
+		fmt.Fprintln(w, strconv.Itoa(Ports[i]))
+	}
+	
+	go _addInstance(userid, challid, Ports)
+}
+
+func _addInstance(userid int, challid int, Ports []int) { //Run Async
 	InstanceId := NextInstanceId	
 	NextInstanceId++
 	ActiveUserInstance[userid] = InstanceId
@@ -751,23 +761,13 @@ func addInstance(w http.ResponseWriter, r *http.Request){
 	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
 	
 	var PortainerId string
-	var Ports []int
 	
 	ch := Challenges[ChallengeIDMap[challid]]
 	if ch.DockerCompose {
-		var new_docker_compose string //Declare this so as to avoid := dockerComposeCopy()
-		new_docker_compose, Ports = dockerComposeCopy(ch.DockerComposeFile)
-		for _, port := range Ports {
-			fmt.Fprintln(w, strconv.Itoa(port))
-		}
-		
+		new_docker_compose := dockerComposeCopy(ch.DockerComposeFile, Ports)
 		PortainerId = launchStack(ch.ChallengeName, new_docker_compose, discriminant)
 	} else {
-		external_port := getRandomPort()
-		fmt.Fprintf(w, strconv.Itoa(external_port))
-		
-		Ports = []int{external_port}
-		PortainerId = launchContainer(ch.ChallengeName, ch.ImageName, ch.DockerCmds, ch.InternalPort, external_port, discriminant)
+		PortainerId = launchContainer(ch.ChallengeName, ch.ImageName, ch.DockerCmds, ch.InternalPort, Ports[0], discriminant)
 	}
 	
 	debug("Portainer ID:", PortainerId)
