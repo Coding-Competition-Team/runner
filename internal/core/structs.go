@@ -1,4 +1,4 @@
-package main
+package core
 
 type InstanceData struct {
 	UserId           int

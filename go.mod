@@ -1,4 +1,4 @@
-module github.com/ItzyBitzySpider/runner
+module runner
 
 go 1.17
 

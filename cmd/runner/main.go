@@ -1,7 +1,6 @@
 package main
 
 import (
-
 	"bytes"
 	"crypto/tls"
 	"database/sql"
@@ -13,6 +12,9 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+
+	//"runner/internal/api"
+	"runner/internal/core"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +30,7 @@ import (
 //
 
 var ActiveUserInstance map[int]int = make(map[int]int)                                               //UserId -> InstanceId
-var InstanceMap map[int]InstanceData = make(map[int]InstanceData)                                    //InstanceId -> InstanceData
+var InstanceMap map[int]core.InstanceData = make(map[int]core.InstanceData)                          //InstanceId -> InstanceData
 var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator) //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
 var UsedPorts map[int]bool = make(map[int]bool)
 
@@ -37,7 +39,7 @@ var NextInstanceId int = 1
 var DefaultSecondsPerInstance int64 = 300
 var DefaultNanosecondsPerInstance int64 = DefaultSecondsPerInstance * 1e9
 
-var Challenges []Challenge
+var Challenges []core.Challenge
 var ChallengeNamesMap map[string]int = make(map[string]int) //Challenge Name -> Challenges Array Index
 var ChallengeIDMap map[int]int = make(map[int]int)          //Challenge ID -> Challenges Array Index
 
@@ -327,7 +329,7 @@ func loadChallenge(ctf_name string, challenge_name string) {
 
 		docker_compose_file := string(_docker_compose_file)
 
-		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: dockerComposePortCount(docker_compose_file), DockerComposeFile: docker_compose_file})
+		Challenges = append(Challenges, core.Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: dockerComposePortCount(docker_compose_file), DockerComposeFile: docker_compose_file})
 	} else {
 		internal_port, err := os.ReadFile(path + PS + "PORT.txt")
 		if err != nil {
@@ -344,7 +346,7 @@ func loadChallenge(ctf_name string, challenge_name string) {
 			panic(err)
 		}
 
-		Challenges = append(Challenges, Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: 1, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserializeNL(string(docker_cmds))})
+		Challenges = append(Challenges, core.Challenge{ChallengeId: -1, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: 1, InternalPort: string(internal_port), ImageName: string(image_name), DockerCmds: deserializeNL(string(docker_cmds))})
 	}
 
 	ChallengeNamesMap[challenge_name] = len(Challenges) - 1 //Current index of most recently appended challenge
@@ -511,7 +513,7 @@ func syncInstances() {
 			ports = append(ports, port)
 			UsedPorts[port] = true
 		}
-		InstanceMap[instance_id] = InstanceData{UserId: usr_id, ChallengeId: challenge_id, InstanceTimeLeft: instance_timeout, PortainerId: portainer_id, Ports: ports}
+		InstanceMap[instance_id] = core.InstanceData{UserId: usr_id, ChallengeId: challenge_id, InstanceTimeLeft: instance_timeout, PortainerId: portainer_id, Ports: ports}
 	}
 }
 
@@ -812,7 +814,7 @@ func _addInstance(userid int, challid int, Ports []int) { //Run Async
 	InstanceTimeLeft := time.Now().UnixNano() + DefaultNanosecondsPerInstance
 	InstanceQueue.Put(InstanceTimeLeft, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
-	InstanceMap[InstanceId] = InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, Ports: Ports} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
+	InstanceMap[InstanceId] = core.InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, Ports: Ports} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
 
 	db, err := sql.Open("mysql", MySQLUsername+":"+MySQLPassword+"@tcp("+MySQLIP+")/runner_db")
 	if err != nil {
