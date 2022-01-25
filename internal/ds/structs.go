@@ -1,4 +1,4 @@
-package core
+package ds
 
 type InstanceData struct {
 	UserId           int
