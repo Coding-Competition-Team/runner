@@ -1,6 +1,7 @@
 package main
 
 import (
+
 	"bytes"
 	"crypto/tls"
 	"database/sql"
@@ -21,33 +22,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"gopkg.in/yaml.v2"
 )
-
-//
-// Structs
-//
-
-type InstanceData struct {
-	UserId           int
-	ChallengeId      int
-	InstanceTimeLeft int64 //Unix (Nano) Timestamp of Instance Timeout
-	PortainerId      string
-	Ports            []int
-}
-
-type Challenge struct {
-	ChallengeId   int //Defaults to -1 (Unknown ChallengeId)
-	ChallengeName string
-	DockerCompose bool
-	PortCount     int
-
-	//For DockerCompose = false:
-	InternalPort string
-	ImageName    string
-	DockerCmds   []string
-
-	//For DockerCompose = true:
-	DockerComposeFile string
-}
 
 //
 // Global Variables
