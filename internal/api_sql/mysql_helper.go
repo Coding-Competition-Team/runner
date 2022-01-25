@@ -3,6 +3,8 @@ package api_sql
 import (
 	"strconv"
 	"strings"
+
+	"runner/internal/creds"
 )
 
 func Deserialize(str string, delim string) []string {
@@ -33,4 +35,8 @@ func SerializeI(dat []int, delim string) string {
 		}
 	}
 	return str
+}
+
+func GetSqlDataSource() string {
+	return creds.MySQLUsername+":"+creds.MySQLPassword+"@tcp("+creds.MySQLIP+")/runner_db"
 }

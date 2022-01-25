@@ -68,7 +68,3 @@ func getPortainerJWT() string {
 
 	return raw["jwt"]
 }
-
-func GetSqlDataSource() string {
-	return MySQLUsername+":"+MySQLPassword+"@tcp("+MySQLIP+")/runner_db"
-}

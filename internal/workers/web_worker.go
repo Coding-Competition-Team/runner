@@ -1,18 +1,14 @@
 package workers
 
 import (
-	"database/sql"
 	"fmt"
 	http_log "log"
 	"net/http"
 	"strconv"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
-
 	"runner/internal/api_portainer"
 	"runner/internal/api_sql"
-	"runner/internal/creds"
 	"runner/internal/ds"
 	"runner/internal/log"
 	"runner/internal/yaml"
@@ -98,23 +94,7 @@ func _addInstance(userid int, challid int, Ports []int) { //Run Async
 	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
 	ds.InstanceMap[InstanceId] = ds.InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, Ports: Ports} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
 
-	db, err := sql.Open("mysql", creds.GetSqlDataSource())
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	stmt1, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, challenge_id, instance_timeout, ports_used) VALUES(?, ?, ?, ?, ?)")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt1.Close()
-
-	serialized_ports := api_sql.SerializeI(Ports, ",")
-	_, err = stmt1.Exec(InstanceId, userid, challid, InstanceTimeLeft, serialized_ports)
-	if err != nil {
-		panic(err)
-	}
+	api_sql.AddInstance(InstanceId, userid, challid, InstanceTimeLeft, Ports)
 
 	var PortainerId string
 
@@ -132,16 +112,7 @@ func _addInstance(userid int, challid int, Ports []int) { //Run Async
 	entry.PortainerId = PortainerId
 	ds.InstanceMap[InstanceId] = entry //Update PortainerId once it's available
 
-	stmt2, err := db.Prepare("UPDATE instances SET portainer_id = ? WHERE instance_id = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt2.Close()
-
-	_, err = stmt2.Exec(PortainerId, InstanceId)
-	if err != nil {
-		panic(err)
-	}
+	api_sql.SetInstancePortainerId(InstanceId, PortainerId)
 }
 
 func removeInstance(w http.ResponseWriter, r *http.Request) {
@@ -259,20 +230,5 @@ func _extendTimeLeft(userid int) { //Run Async
 	ds.InstanceQueue.Remove(a)
 	ds.InstanceQueue.Put(NewInstanceTimeLeft, InstanceId) //Replace
 
-	db, err := sql.Open("mysql", creds.GetSqlDataSource())
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	stmt, err := db.Prepare("UPDATE instances SET instance_timeout = ? WHERE instance_id = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(NewInstanceTimeLeft, InstanceId)
-	if err != nil {
-		panic(err)
-	}
+	api_sql.UpdateInstanceTime(InstanceId, NewInstanceTimeLeft)
 }
