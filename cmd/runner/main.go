@@ -564,30 +564,6 @@ func getPortainerJWT() string {
 	return raw["jwt"]
 }
 
-func getEndpoints() {
-	client := http.Client{}
-	req, err := http.NewRequest("GET", PortainerURL+"/api/endpoints", nil)
-	if err != nil {
-		panic(err)
-	}
-
-	req.Header = http.Header{
-		"Authorization": []string{"Bearer " + PortainerJWT},
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	info("getEndpoints", string(body))
-}
-
 func launchContainer(container_name string, image_name string, cmds []string, internal_port string, _external_port int, discriminant string) string {
 	external_port := strconv.Itoa(_external_port)
 
@@ -634,29 +610,6 @@ func launchContainer(container_name string, image_name string, cmds []string, in
 	startContainer(id)
 
 	return id
-}
-
-func containersList() {
-	client := http.Client{}
-	req, err := http.NewRequest("GET", PortainerURL+"/api/endpoints/2/docker/containers/json", nil)
-	if err != nil {
-		panic(err)
-	}
-
-	req.Header = http.Header{
-		"Authorization": []string{"Bearer " + PortainerJWT},
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	info("containersList", string(body))
 }
 
 func startContainer(id string) {
@@ -769,29 +722,6 @@ func deleteStack(id string) {
 	}
 
 	info("deleteStack", string(body))
-}
-
-func stacksList() {
-	client := http.Client{}
-	req, err := http.NewRequest("GET", PortainerURL+"/api/stacks", nil)
-	if err != nil {
-		panic(err)
-	}
-
-	req.Header = http.Header{
-		"Authorization": []string{"Bearer " + PortainerJWT},
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	info("stacksList", string(body))
 }
 
 func getRandomPort() int { //Returns an (unused) random port from [1024, 65536)
@@ -1006,7 +936,7 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request) {
 
 	InstanceId := ActiveUserInstance[userid]
 
-	fmt.Fprintf(w, strconv.FormatInt((InstanceMap[InstanceId].InstanceTimeLeft-time.Now().UnixNano())/1e9, 10))
+	fmt.Fprint(w, strconv.FormatInt((InstanceMap[InstanceId].InstanceTimeLeft-time.Now().UnixNano())/1e9, 10))
 }
 
 func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
@@ -1076,9 +1006,6 @@ func main() {
 	UsedPorts[22] = true   //SSH
 
 	syncWithDB()
-
-	getEndpoints()
-	containersList()
 
 	killWorker := NewWorker(10 * time.Second)
 	go killWorker.Run()
