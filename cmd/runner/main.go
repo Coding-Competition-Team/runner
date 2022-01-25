@@ -67,6 +67,7 @@ var Challenges []Challenge
 var ChallengeNamesMap map[string]int = make(map[string]int) //Challenge Name -> Challenges Array Index
 var ChallengeIDMap map[int]int = make(map[int]int)          //Challenge ID -> Challenges Array Index
 
+var CredentialsJsonFile string = "../../configs/Credentials/credentials.json"
 var ChallDataFolder string = "../../configs/CTF Challenge Data"
 var PS string = "/"
 
@@ -77,7 +78,7 @@ var MySQLPassword string = ""
 var PortainerURL string = ""
 var PortainerUsername string = ""
 var PortainerPassword string = ""
-var PortainerJWT string = getPortainerJWT()
+var PortainerJWT string = ""
 
 //
 // Worker Threads
@@ -185,6 +186,25 @@ func (w *Worker) Action() {
 //
 // IO Stuff
 //
+
+func loadCredentials() {
+	json_data, err := os.ReadFile(CredentialsJsonFile)
+	if err != nil {
+		panic(err)
+	}
+
+	var result map[string]map[string]string
+	json.Unmarshal([]byte(json_data), &result)
+
+	MySQLIP = result["mysql"]["ip"]
+	MySQLUsername = result["mysql"]["username"]
+	MySQLPassword = result["mysql"]["password"]
+
+	PortainerURL = result["portainer"]["url"]
+	PortainerUsername = result["portainer"]["username"]
+	PortainerPassword = result["portainer"]["password"]
+	PortainerJWT = getPortainerJWT()
+}
 
 func getFileNames(dir string) []string {
 	file, err := os.Open(dir)
@@ -368,7 +388,9 @@ func loadCTF(ctf_name string) {
 func loadChallengeFiles() {
 	lst := getFileNames(ChallDataFolder)
 	for _, name := range lst {
-		loadCTF(name)
+		if name != ".gitignore" {
+			loadCTF(name)
+		}
 	}
 }
 
@@ -999,6 +1021,8 @@ func _extendTimeLeft(userid int) { //Run Async
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
+
+	loadCredentials()
 
 	UsedPorts[8000] = true //Portainer
 	UsedPorts[9443] = true //Portainer
