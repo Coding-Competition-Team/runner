@@ -49,7 +49,7 @@ for challenge in challenges:
     challenge.image = challenge.name + challenge.service
 
     # Write to files
-    with open(dir+'PORT.txt', 'w') as file:
+    with open(os.path.join(dir, 'PORT.txt'), 'w') as file:
         file.write(challenge.port)
-    with open(dir+'IMAGE.txt', 'w') as file:
+    with open(os.path.join(dir, 'IMAGE.txt'), 'w') as file:
         file.write(challenge.image)
