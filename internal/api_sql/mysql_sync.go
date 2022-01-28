@@ -2,7 +2,6 @@ package api_sql
 
 import (
 	"database/sql"
-	"encoding/json"
 	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -18,99 +17,30 @@ func syncChallenges() {
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT challenge_id, challenge_name FROM challenges") //Get currently registered challenges in the DB
+	rows, err := db.Query("SELECT challenge_id, challenge_name, docker_compose, port_count, internal_port, image_name, docker_cmds, docker_compose_file FROM challenges") //Get currently registered challenges in the DB
 	if err != nil {
 		panic(err)
 	}
 	defer rows.Close()
 
-	var challenge_ids []int
-	var challenge_names []string //Assumes no duplicate challenge names
-
 	for rows.Next() {
 		var challenge_id int
 		var challenge_name string
-		if err := rows.Scan(&challenge_id, &challenge_name); err != nil {
+		var docker_compose bool
+		var port_count int
+		var internal_port string
+		var image_name string
+		var docker_cmds string
+		var docker_compose_file string
+
+		if err := rows.Scan(&challenge_id, &challenge_name, &docker_compose, &port_count, &internal_port, &image_name, &docker_cmds, &docker_compose_file); err != nil {
 			panic(err)
 		}
 
-		challenge_ids = append(challenge_ids, challenge_id)
-		challenge_names = append(challenge_names, challenge_name)
-	}
-
-	var new_challenge_names map[string]int = make(map[string]int) //TODO: Better way to do a deepcopy?
-	jsonStr, err := json.Marshal(ds.ChallengeNamesMap)
-	if err != nil {
-		panic(err)
-	}
-	err = json.Unmarshal(jsonStr, &new_challenge_names)
-	if err != nil {
-		panic(err)
-	}
-
-	var edit_challenge_ids []int
-	var edit_challenge_names []string
-
-	for i, name := range challenge_names {
-		_, ok := new_challenge_names[name]
-		if ok { //Challenge name already exists in DB
-			id := challenge_ids[i]
-			idx := ds.ChallengeNamesMap[name]
-
-			delete(new_challenge_names, name)
-			edit_challenge_names = append(edit_challenge_names, name)
-			edit_challenge_ids = append(edit_challenge_ids, id)
-
-			ds.Challenges[idx].ChallengeId = id //Replace with ChallengeId in DB
-			ds.ChallengeIDMap[id] = idx
-		} else {
-			log.Warn("Challenge", name, "exists in DB but is not in use!")
-		}
-	}
-
-	stmt1, err := db.Prepare("INSERT INTO challenges (challenge_name, docker_compose, port_count, internal_port, image_name, docker_cmds, docker_compose_file) VALUES(?, ?, ?, ?, ?, ?, ?)")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt1.Close()
-
-	stmt1b, err := db.Prepare("SELECT challenge_id FROM challenges WHERE challenge_name = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt1b.Close()
-
-	for k, v := range new_challenge_names { //Insert new challenges
-		log.Debug("New Challenge:", k, ",", v)
-
-		ch := ds.Challenges[v]
-		_, err = stmt1.Exec(k, ch.DockerCompose, ch.PortCount, ch.InternalPort, ch.ImageName, Serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile)
-		if err != nil {
-			panic(err)
-		}
-
-		var challenge_id int
-		if err := stmt1b.QueryRow(k).Scan(&challenge_id); err != nil {
-			panic(err)
-		}
-		ds.Challenges[v].ChallengeId = challenge_id //Get DB assigned challenge id
-		ds.ChallengeIDMap[challenge_id] = v
-	}
-
-	stmt2, err := db.Prepare("UPDATE challenges SET docker_compose = ?, port_count = ?, internal_port = ?, image_name = ?, docker_cmds = ?, docker_compose_file = ? WHERE challenge_id = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt2.Close()
-
-	for i, name := range edit_challenge_names { //Edit pre-existing challenges
-		log.Debug("Edit Challenge:", i, ",", name)
-
-		ch := ds.Challenges[ds.ChallengeNamesMap[name]]
-		_, err = stmt2.Exec(ch.DockerCompose, ch.PortCount, ch.InternalPort, ch.ImageName, Serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile, edit_challenge_ids[i])
-		if err != nil {
-			panic(err)
-		}
+		ch := ds.Challenge{ChallengeId: challenge_id, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: port_count, InternalPort: internal_port, ImageName: image_name, DockerCmds: DeserializeNL(docker_cmds), DockerComposeFile: docker_compose_file}
+		ds.Challenges = append(ds.Challenges, ch)
+		ds.ChallengeNamesMap[challenge_name] = len(ds.Challenges) - 1
+		ds.ChallengeIDMap[challenge_id] = len(ds.Challenges) - 1
 	}
 }
 
@@ -160,7 +90,6 @@ func syncInstances() {
 
 func SyncWithDB() {
 	log.Info("Starting DB Sync...")
-	loadChallengeFiles()
 	syncChallenges()
 	log.Debug("Challenge Data:", ds.Challenges)
 	log.Debug("Challenge ID Map:", ds.ChallengeIDMap)
