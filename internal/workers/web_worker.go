@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -274,13 +275,18 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if docker_compose {
-		docker_compose_file, ok := result["docker_compose_file"]
+		_docker_compose_file, ok := result["docker_compose_file"]
 		if !ok {
 			http.Error(w, "Missing docker_compose_file", http.StatusBadRequest)
 			return
 		}
+		docker_compose_file, err := base64.StdEncoding.DecodeString(_docker_compose_file)
+		if err != nil {
+			http.Error(w, "Invalid base64 encoding for docker_compose_file", http.StatusBadRequest)
+			return
+		}
 
-		go _addChallengeDockerCompose(challenge_name, docker_compose_file)
+		go _addChallengeDockerCompose(challenge_name, string(docker_compose_file))
 	} else {
 		internal_port, ok := result["internal_port"]
 		if !ok {
@@ -292,13 +298,18 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Missing image_name", http.StatusBadRequest)
 			return
 		}
-		docker_cmds, ok := result["docker_cmds"]
+		_docker_cmds, ok := result["docker_cmds"]
 		if !ok {
 			http.Error(w, "Missing docker_cmds", http.StatusBadRequest)
 			return
 		}
+		docker_cmds, err := base64.StdEncoding.DecodeString(_docker_cmds)
+		if err != nil {
+			http.Error(w, "Invalid base64 encoding for docker_cmds", http.StatusBadRequest)
+			return
+		}
 
-		go _addChallengeNonDockerCompose(challenge_name, internal_port, image_name, docker_cmds)
+		go _addChallengeNonDockerCompose(challenge_name, internal_port, image_name, string(docker_cmds))
 	}
 }
 
