@@ -17,8 +17,8 @@ var NextInstanceId int = 1
 var DefaultSecondsPerInstance int64 = 300
 var DefaultNanosecondsPerInstance int64 = DefaultSecondsPerInstance * 1e9
 
-var ChallengeMap map[int]Challenge = make(map[int]Challenge)          //Challenge ID -> Challenges
-var ChallengeNamesMap map[string]int = make(map[string]int)           //Challenge Name -> Challenge ID
+var ChallengeMap map[int]Challenge = make(map[int]Challenge) //Challenge ID -> Challenges
+var ChallengeNamesMap map[string]int = make(map[string]int)  //Challenge Name -> Challenge ID
 
 var PS string = "/"
 var ChallDataFolder string = "../../configs/CTF Challenge Data"

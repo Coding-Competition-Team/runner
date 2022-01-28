@@ -1,7 +1,9 @@
 package workers
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	http_log "log"
 	"net/http"
 	"strconv"
@@ -9,6 +11,7 @@ import (
 
 	"runner/internal/api_portainer"
 	"runner/internal/api_sql"
+	"runner/internal/creds"
 	"runner/internal/ds"
 	"runner/internal/log"
 	"runner/internal/yaml"
@@ -19,6 +22,7 @@ func HandleRequests() {
 	http.HandleFunc("/removeInstance", removeInstance)
 	http.HandleFunc("/getTimeLeft", getTimeLeft)
 	http.HandleFunc("/extendTimeLeft", extendTimeLeft)
+	http.HandleFunc("/addChallenge", addChallenge)
 	http_log.Fatal(http.ListenAndServe(":10000", nil))
 }
 
@@ -231,4 +235,88 @@ func _extendTimeLeft(userid int) { //Run Async
 	ds.InstanceQueue.Put(NewInstanceTimeLeft, InstanceId) //Replace
 
 	api_sql.UpdateInstanceTime(InstanceId, NewInstanceTimeLeft)
+}
+
+func addChallenge(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+
+	if auth == "" {
+		http.Error(w, "Authorization missing", http.StatusBadRequest)
+		return
+	} else if auth != creds.APIAuthorization { //TODO: Make this comparison secure
+		http.Error(w, "Invalid authorization", http.StatusBadRequest)
+		return
+	}
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Cannot read body", http.StatusBadRequest)
+		return
+	}
+
+	var result map[string]string
+	json.Unmarshal(body, &result)
+
+	challenge_name, ok := result["challenge_name"]
+	if !ok {
+		http.Error(w, "Missing challenge_name", http.StatusBadRequest)
+		return
+	}
+	_docker_compose, ok := result["docker_compose"]
+	if !ok {
+		http.Error(w, "Missing docker_compose", http.StatusBadRequest)
+		return
+	}
+	docker_compose, err := strconv.ParseBool(_docker_compose)
+	if err != nil {
+		http.Error(w, "Invalid docker_compose", http.StatusBadRequest)
+		return
+	}
+
+	if docker_compose {
+		docker_compose_file, ok := result["docker_compose_file"]
+		if !ok {
+			http.Error(w, "Missing docker_compose_file", http.StatusBadRequest)
+			return
+		}
+
+		go _addChallengeDockerCompose(challenge_name, docker_compose_file)
+	} else {
+		internal_port, ok := result["internal_port"]
+		if !ok {
+			http.Error(w, "Missing internal_port", http.StatusBadRequest)
+			return
+		}
+		image_name, ok := result["image_name"]
+		if !ok {
+			http.Error(w, "Missing image_name", http.StatusBadRequest)
+			return
+		}
+		docker_cmds, ok := result["docker_cmds"]
+		if !ok {
+			http.Error(w, "Missing docker_cmds", http.StatusBadRequest)
+			return
+		}
+
+		go _addChallengeNonDockerCompose(challenge_name, internal_port, image_name, docker_cmds)
+	}
+}
+
+func _addChallengeDockerCompose(challenge_name string, docker_compose_file string) { //Run Async
+	port_count := yaml.DockerComposePortCount(docker_compose_file)
+	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, true, port_count)
+	ch := ds.Challenge{ChallengeId: challenge_id, ChallengeName: challenge_name, DockerCompose: true, PortCount: port_count, DockerComposeFile: docker_compose_file}
+	api_sql.UpdateChallenge(ch)
+
+	ds.ChallengeMap[challenge_id] = ch
+	ds.ChallengeNamesMap[challenge_name] = challenge_id
+}
+
+func _addChallengeNonDockerCompose(challenge_name string, internal_port string, image_name string, docker_cmds string) { //Run Async
+	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, false, 1)
+	ch := ds.Challenge{ChallengeId: challenge_id, ChallengeName: challenge_name, DockerCompose: false, PortCount: 1, InternalPort: internal_port, ImageName: image_name, DockerCmds: api_sql.DeserializeNL(docker_cmds)}
+	api_sql.UpdateChallenge(ch)
+
+	ds.ChallengeMap[challenge_id] = ch
+	ds.ChallengeNamesMap[challenge_name] = challenge_id
 }

@@ -20,6 +20,8 @@ var PortainerUsername string = ""
 var PortainerPassword string = ""
 var PortainerJWT string = ""
 
+var APIAuthorization string = ""
+
 func LoadCredentials() {
 	json_data, err := os.ReadFile(ds.CredentialsJsonFile)
 	if err != nil {
@@ -27,7 +29,7 @@ func LoadCredentials() {
 	}
 
 	var result map[string]map[string]string
-	json.Unmarshal([]byte(json_data), &result)
+	json.Unmarshal(json_data, &result)
 
 	MySQLIP = result["mysql"]["ip"]
 	MySQLUsername = result["mysql"]["username"]
@@ -36,6 +38,9 @@ func LoadCredentials() {
 	PortainerURL = result["portainer"]["url"]
 	PortainerUsername = result["portainer"]["username"]
 	PortainerPassword = result["portainer"]["password"]
+
+	APIAuthorization = result["api"]["authorization"]
+
 	PortainerJWT = getPortainerJWT()
 }
 
