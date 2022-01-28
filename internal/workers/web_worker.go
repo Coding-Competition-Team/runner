@@ -298,15 +298,15 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Missing image_name", http.StatusBadRequest)
 			return
 		}
+
 		_docker_cmds, ok := result["docker_cmds"]
-		if !ok {
-			http.Error(w, "Missing docker_cmds", http.StatusBadRequest)
-			return
-		}
-		docker_cmds, err := base64.StdEncoding.DecodeString(_docker_cmds)
-		if err != nil {
-			http.Error(w, "Invalid base64 encoding for docker_cmds", http.StatusBadRequest)
-			return
+		var docker_cmds []byte
+		if ok { //docker_cmds is optional
+			docker_cmds, err = base64.StdEncoding.DecodeString(_docker_cmds)
+			if err != nil {
+				http.Error(w, "Invalid base64 encoding for docker_cmds", http.StatusBadRequest)
+				return
+			}
 		}
 
 		go _addChallengeNonDockerCompose(challenge_name, internal_port, image_name, string(docker_cmds))
