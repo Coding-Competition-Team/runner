@@ -24,7 +24,7 @@ func HandleRequests() {
 	http.HandleFunc("/getTimeLeft", getTimeLeft)
 	http.HandleFunc("/extendTimeLeft", extendTimeLeft)
 	http.HandleFunc("/addChallenge", addChallenge)
-	http_log.Fatal(http.ListenAndServe(":10000", nil))
+	http_log.Fatal(http.ListenAndServe(":" + strconv.Itoa(ds.RunnerPort), nil))
 }
 
 //fmt.Fprintf() - print to web

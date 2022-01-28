@@ -7,6 +7,8 @@ import (
 	"github.com/emirpasic/gods/utils"
 )
 
+var RunnerPort = 10000
+
 var ActiveUserInstance map[int]int = make(map[int]int)                                               //UserId -> InstanceId
 var InstanceMap map[int]InstanceData = make(map[int]InstanceData)                                    //InstanceId -> InstanceData
 var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator) //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
@@ -25,10 +27,11 @@ var ChallDataFolder string = "../../configs/CTF Challenge Data"
 var CredentialsJsonFile string = "../../configs/Credentials/credentials.json"
 
 func ReserveDefaultPorts() {
-	UsedPorts[8000] = true //Portainer
-	UsedPorts[9443] = true //Portainer
-	UsedPorts[3306] = true //Runner DB
-	UsedPorts[22] = true   //SSH
+	UsedPorts[RunnerPort] = true //Runner
+	UsedPorts[8000] = true       //Portainer
+	UsedPorts[9443] = true       //Portainer
+	UsedPorts[3306] = true       //Runner DB
+	UsedPorts[22] = true         //SSH
 }
 
 func GetRandomPort() int { //Returns an (unused) random port from [1024, 65536)
