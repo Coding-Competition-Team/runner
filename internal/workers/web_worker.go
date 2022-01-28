@@ -29,7 +29,7 @@ func validateUserid(userid int) bool {
 }
 
 func validateChallid(challid int) bool {
-	_, ok := ds.ChallengeIDMap[challid]
+	_, ok := ds.ChallengeMap[challid]
 	return ok
 }
 
@@ -74,7 +74,7 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ch := ds.Challenges[ds.ChallengeIDMap[challid]]
+	ch := ds.ChallengeMap[challid]
 
 	Ports := make([]int, ch.PortCount) //Cannot directly use [ch.PortCount]int
 	for i := 0; i < ch.PortCount; i++ {
@@ -98,7 +98,7 @@ func _addInstance(userid int, challid int, Ports []int) { //Run Async
 
 	var PortainerId string
 
-	ch := ds.Challenges[ds.ChallengeIDMap[challid]]
+	ch := ds.ChallengeMap[challid]
 	if ch.DockerCompose {
 		new_docker_compose := yaml.DockerComposeCopy(ch.DockerComposeFile, Ports)
 		PortainerId = api_portainer.LaunchStack(ch.ChallengeName, new_docker_compose, discriminant)

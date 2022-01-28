@@ -38,9 +38,8 @@ func syncChallenges() {
 		}
 
 		ch := ds.Challenge{ChallengeId: challenge_id, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: port_count, InternalPort: internal_port, ImageName: image_name, DockerCmds: DeserializeNL(docker_cmds), DockerComposeFile: docker_compose_file}
-		ds.Challenges = append(ds.Challenges, ch)
-		ds.ChallengeNamesMap[challenge_name] = len(ds.Challenges) - 1
-		ds.ChallengeIDMap[challenge_id] = len(ds.Challenges) - 1
+		ds.ChallengeMap[challenge_id] = ch
+		ds.ChallengeNamesMap[challenge_name] = challenge_id
 	}
 }
 
@@ -91,8 +90,7 @@ func syncInstances() {
 func SyncWithDB() {
 	log.Info("Starting DB Sync...")
 	syncChallenges()
-	log.Debug("Challenge Data:", ds.Challenges)
-	log.Debug("Challenge ID Map:", ds.ChallengeIDMap)
+	log.Debug("Challenge Map:", ds.ChallengeMap)
 	syncInstances()
 	log.Debug("Instance Map:", ds.InstanceMap)
 	log.Info("DB Sync Complete!")

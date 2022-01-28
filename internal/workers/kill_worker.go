@@ -77,7 +77,7 @@ func (w *Worker) Action() {
 			api_sql.DeleteInstance(InstanceId)
 
 			PortainerId := ds.InstanceMap[InstanceId].PortainerId
-			if ds.Challenges[ds.ChallengeIDMap[ds.InstanceMap[InstanceId].ChallengeId]].DockerCompose {
+			if ds.ChallengeMap[ds.InstanceMap[InstanceId].ChallengeId].DockerCompose {
 				api_portainer.DeleteStack(PortainerId)
 			} else {
 				api_portainer.DeleteContainer(PortainerId)
