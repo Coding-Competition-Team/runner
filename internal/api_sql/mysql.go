@@ -119,21 +119,21 @@ func getChallengeId(challenge_name string) int {
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT challenge_id FROM challenges WHERE challenge_name = "+challenge_name)
+	stmt, err := db.Prepare("SELECT challenge_id FROM challenges WHERE challenge_name = ?")
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer stmt.Close()
 
-	for rows.Next() {
-		var challenge_id int
-		if err := rows.Scan(&challenge_id); err != nil {
-			panic(err)
-		}
-		return challenge_id //Assume there are no duplicate challenge names
+	var challenge_id int
+	err = stmt.QueryRow(challenge_name).Scan(&challenge_id)
+	if err == sql.ErrNoRows {
+		return -1
+	} else if err != nil {
+		panic(err)
 	}
-
-	return -1
+	
+	return challenge_id //Assume there are no duplicate challenge names
 }
 
 func UpdateChallenge(ch ds.Challenge) {
