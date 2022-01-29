@@ -1,8 +1,0 @@
-stuff to do per chall:
-1. Build Docker image
-	- Image name in the format ctfname_challengename
-2. Formatting for single Dockerfile:
-	- PORT.txt: single line with port used inside
-	- IMAGE.txt: image name
-2. For docker-compose:
-	- Not implemented yet

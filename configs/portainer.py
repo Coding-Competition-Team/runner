@@ -1,11 +1,15 @@
 import os
 import subprocess
 
-import docker
+import requests
 import yaml
 
 CTFs = []
 challenges = []
+runner_endpoint = 'http://localhost'
+runner_pw = os.getenv('API_AUTH')
+if runner_pw == '':
+    print('Runner authentication token has not been set! (API_AUTH=) Please set it before running the script.')
 
 class Challenge():
     def __init__(self, CTF, name):
@@ -35,21 +39,35 @@ for challenge in challenges:
     dir = os.path.join('.', challenge.CTF, challenge.name)
 
     # Parse docker-compose.yml 
-    with open(os.path.join(dir, 'docker-compose.yml')) as file:
-        chall_data = yaml.safe_load(file)
+    try:
+        with open(os.path.join(dir, 'docker-compose.yml')) as file:
+            chall_data = yaml.safe_load(file)
+    except:
+        print(f'{challenge.name} has no docker-compose')
+        continue
 
     # Get port
     for key in chall_data['services'].keys():
-        challenge.service = key
-        challenge.port = chall_data['services'][key]['ports'][0][:4]
+        challenge.port = chall_data['services'][key]['ports'][0][5:]
+        # TODO: add support for multiple services
         break
 
     # Build image 
-    docker_compose = subprocess.run(['docker-compose', '-f', os.path.join(dir, 'docker-compose.yml'), 'build'], shell=True, capture_output=True, env=env)
-    challenge.image = challenge.name + challenge.service
+    docker = subprocess.run([f'docker build --tag {challenge.CTF}_{challenge.name} {dir}'], shell=True, capture_output=True, env=env)
+    if docker.stderr != b'':
+        print(f'An error occurred while building the image. {bytes.decode(docker.stderr, "utf-8")}')
+        continue
+    challenge.image = f'{challenge.CTF}_{challenge.name}'
 
-    # Write to files
-    with open(os.path.join(dir, 'PORT.txt'), 'w') as file:
-        file.write(challenge.port)
-    with open(os.path.join(dir, 'IMAGE.txt'), 'w') as file:
-        file.write(challenge.image)
+    # Send POST to runner
+    headers = { 
+            'Authorization': runner_pw
+    }
+    payload = {
+            'challenge_name': challenge.name,
+            'docker_compose': 'False',
+            'internal_port': challenge.port,
+            'image_name': challenge.image
+    }
+    requests.post(f'{runner_endpoint}/addChallenge', headers=headers, json=payload)
+    print(f'{challenge.name} in {challenge.CTF} has been deployed successfully as {challenge.image}')
