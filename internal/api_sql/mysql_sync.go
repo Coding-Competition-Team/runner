@@ -24,7 +24,7 @@ func syncChallenges() {
 	defer rows.Close()
 
 	for rows.Next() {
-		var challenge_id int
+		var challenge_id string
 		var challenge_name string
 		var docker_compose bool
 		var port_count int
@@ -39,7 +39,6 @@ func syncChallenges() {
 
 		ch := ds.Challenge{ChallengeId: challenge_id, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: port_count, InternalPort: internal_port, ImageName: image_name, DockerCmds: DeserializeNL(docker_cmds), DockerComposeFile: docker_compose_file}
 		ds.ChallengeMap[challenge_id] = ch
-		ds.ChallengeNamesMap[challenge_name] = challenge_id
 	}
 }
 
@@ -59,7 +58,7 @@ func syncInstances() {
 	for rows.Next() {
 		var instance_id int
 		var usr_id int
-		var challenge_id int
+		var challenge_id string
 		var portainer_id string
 		var instance_timeout int64
 		var ports_used string

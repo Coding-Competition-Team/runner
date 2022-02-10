@@ -33,7 +33,7 @@ func validateUserid(userid int) bool {
 	return true
 }
 
-func validateChallid(challid int) bool {
+func validateChallid(challid string) bool {
 	_, ok := ds.ChallengeMap[challid]
 	return ok
 }
@@ -60,10 +60,7 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing challid", http.StatusForbidden)
 		return
 	}
-	challid, err := strconv.Atoi(_challid[0])
-	if err != nil {
-		panic(err)
-	}
+	challid := _challid[0]
 	if !validateChallid(challid) {
 		http.Error(w, "Invalid challid", http.StatusForbidden)
 		return
@@ -90,7 +87,7 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 	go _addInstance(userid, challid, Ports)
 }
 
-func _addInstance(userid int, challid int, Ports []int) { //Run Async
+func _addInstance(userid int, challid string, Ports []int) { //Run Async
 	InstanceId := ds.NextInstanceId
 	ds.NextInstanceId++
 	ds.ActiveUserInstance[userid] = InstanceId
@@ -320,7 +317,6 @@ func _addChallengeDockerCompose(challenge_name string, docker_compose_file strin
 	api_sql.UpdateChallenge(ch)
 
 	ds.ChallengeMap[challenge_id] = ch
-	ds.ChallengeNamesMap[challenge_name] = challenge_id
 }
 
 func _addChallengeNonDockerCompose(challenge_name string, internal_port string, image_name string, docker_cmds string) { //Run Async
@@ -329,5 +325,4 @@ func _addChallengeNonDockerCompose(challenge_name string, internal_port string, 
 	api_sql.UpdateChallenge(ch)
 
 	ds.ChallengeMap[challenge_id] = ch
-	ds.ChallengeNamesMap[challenge_name] = challenge_id
 }

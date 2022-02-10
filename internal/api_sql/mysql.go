@@ -8,7 +8,7 @@ import (
 	"runner/internal/ds"
 )
 
-func AddInstance(InstanceId int, userid int, challid int, InstanceTimeLeft int64, Ports []int) {
+func AddInstance(InstanceId int, userid int, challid string, InstanceTimeLeft int64, Ports []int) {
 	db, err := sql.Open("mysql", GetSqlDataSource())
 	if err != nil {
 		panic(err)
@@ -85,10 +85,10 @@ func UpdateInstanceTime(InstanceId int, NewInstanceTimeLeft int64) {
 	}
 }
 
-func GetOrCreateChallengeId(challenge_name string, docker_compose bool, port_count int) int {
+func GetOrCreateChallengeId(challenge_name string, docker_compose bool, port_count int) string {
 	challenge_id := getChallengeId(challenge_name)
 
-	if challenge_id != -1 {
+	if challenge_id != "" {
 		return challenge_id
 	}
 
@@ -98,13 +98,13 @@ func GetOrCreateChallengeId(challenge_name string, docker_compose bool, port_cou
 	}
 	defer db.Close()
 
-	stmt, err := db.Prepare("INSERT INTO challenges (challenge_name, docker_compose, port_count) VALUES (?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO challenges (challenge_id, challenge_name, docker_compose, port_count) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		panic(err)
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(challenge_name, docker_compose, port_count)
+	_, err = stmt.Exec(ds.GenerateChallengeId(challenge_name), challenge_name, docker_compose, port_count)
 	if err != nil {
 		panic(err)
 	}
@@ -112,7 +112,7 @@ func GetOrCreateChallengeId(challenge_name string, docker_compose bool, port_cou
 	return getChallengeId(challenge_name)
 }
 
-func getChallengeId(challenge_name string) int {
+func getChallengeId(challenge_name string) string {
 	db, err := sql.Open("mysql", GetSqlDataSource())
 	if err != nil {
 		panic(err)
@@ -125,10 +125,10 @@ func getChallengeId(challenge_name string) int {
 	}
 	defer stmt.Close()
 
-	var challenge_id int
+	var challenge_id string
 	err = stmt.QueryRow(challenge_name).Scan(&challenge_id)
 	if err == sql.ErrNoRows {
-		return -1
+		return ""
 	} else if err != nil {
 		panic(err)
 	}

@@ -2,7 +2,7 @@ CREATE DATABASE runner_db;
 USE runner_db;
 
 CREATE TABLE challenges (
-	challenge_id int unsigned NOT NULL AUTO_INCREMENT,
+	challenge_id varchar(32) NOT NULL,
 	challenge_name varchar(255) NOT NULL,
 	docker_compose bool NOT NULL,
 	port_count int NOT NULL,
