@@ -76,16 +76,16 @@ func (w *Worker) Action() {
 		if timestamp <= current_timestamp {
 			api_sql.DeleteInstance(InstanceId)
 
-			PortainerId := ds.InstanceMap[InstanceId].PortainerId
-			if ds.ChallengeMap[ds.InstanceMap[InstanceId].ChallengeId].DockerCompose {
+			PortainerId := ds.InstanceMap[InstanceId].Portainer_Id
+			if ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Docker_Compose {
 				api_portainer.DeleteStack(PortainerId)
 			} else {
 				api_portainer.DeleteContainer(PortainerId)
 			}
 
-			UserId := ds.InstanceMap[InstanceId].UserId
+			UserId := ds.InstanceMap[InstanceId].Usr_Id
 			ds.InstanceQueue.Remove(timestamp)
-			for _, v := range ds.InstanceMap[InstanceId].Ports {
+			for _, v := range api_sql.DeserializeI(ds.InstanceMap[InstanceId].Ports_Used) {
 				delete(ds.UsedPorts, v)
 			}
 			delete(ds.InstanceMap, InstanceId)
