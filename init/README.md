@@ -4,12 +4,12 @@
 
 2. Run the following command to create the runner_db container:
 ```
-docker run --name runner_db -e MYSQL_ROOT_PASSWORD=<password> -d mysql:latest
+docker run --name runner_db -e POSTGRES_PASSWORD=<password> -p 5432:5432 -d postgres:latest
 ```
+
+TODO
 
 3. Run the following command to setup the runner_db (once it has finished initialization):
 ```
 docker exec -i <docker-id> mysql -u root -p<password> < 001_runner_db.sql
 ```
-
-4. Use Portainer's web panel to edit the runner_db container, and manually publish the port mapping 3306:3306 (so that the runner can access the DB)

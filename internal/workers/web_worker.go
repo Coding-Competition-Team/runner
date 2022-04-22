@@ -78,8 +78,8 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 
 	ch := ds.ChallengeMap[challid]
 
-	Ports := make([]int, ch.PortCount) //Cannot directly use [ch.PortCount]int
-	for i := 0; i < ch.PortCount; i++ {
+	Ports := make([]int, ch.Port_Count) //Cannot directly use [ch.PortCount]int
+	for i := 0; i < ch.Port_Count; i++ {
 		Ports[i] = ds.GetRandomPort()
 		fmt.Fprintln(w, strconv.Itoa(Ports[i]))
 	}
@@ -91,27 +91,28 @@ func _addInstance(userid int, challid string, Ports []int) { //Run Async
 	InstanceId := ds.NextInstanceId
 	ds.NextInstanceId++
 	ds.ActiveUserInstance[userid] = InstanceId
-	InstanceTimeLeft := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
-	ds.InstanceQueue.Put(InstanceTimeLeft, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
+	InstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
+	ds.InstanceQueue.Put(InstanceTimeout, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
-	ds.InstanceMap[InstanceId] = ds.InstanceData{UserId: userid, ChallengeId: challid, InstanceTimeLeft: InstanceTimeLeft, Ports: Ports} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
+	instance := ds.Instance{Usr_Id: userid, Challenge_Id: challid, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
+	ds.InstanceMap[InstanceId] = instance
 
-	api_sql.AddInstance(InstanceId, userid, challid, InstanceTimeLeft, Ports)
+	api_sql.AddInstance(instance)
 
 	var PortainerId string
 
 	ch := ds.ChallengeMap[challid]
-	if ch.DockerCompose {
-		new_docker_compose := yaml.DockerComposeCopy(ch.DockerComposeFile, Ports)
-		PortainerId = api_portainer.LaunchStack(ch.ChallengeName, new_docker_compose, discriminant)
+	if ch.Docker_Compose {
+		new_docker_compose := yaml.DockerComposeCopy(ch.Docker_Compose_File, Ports)
+		PortainerId = api_portainer.LaunchStack(ch.Challenge_Name, new_docker_compose, discriminant)
 	} else {
-		PortainerId = api_portainer.LaunchContainer(ch.ChallengeName, ch.ImageName, ch.DockerCmds, ch.InternalPort, Ports[0], discriminant)
+		PortainerId = api_portainer.LaunchContainer(ch.Challenge_Name, ch.Image_Name, api_sql.DeserializeNL(ch.Docker_Cmds), ch.Internal_Port, Ports[0], discriminant)
 	}
 
 	log.Debug("Portainer ID:", PortainerId)
 
 	entry := ds.InstanceMap[InstanceId]
-	entry.PortainerId = PortainerId
+	entry.Portainer_Id = PortainerId
 	ds.InstanceMap[InstanceId] = entry //Update PortainerId once it's available
 
 	api_sql.SetInstancePortainerId(InstanceId, PortainerId)
@@ -140,7 +141,7 @@ func removeInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	InstanceId := ds.ActiveUserInstance[userid]
-	if ds.InstanceMap[InstanceId].PortainerId == "" {
+	if ds.InstanceMap[InstanceId].Portainer_Id == "" {
 		http.Error(w, "The instance is still starting", http.StatusForbidden)
 		return
 	}
@@ -149,10 +150,10 @@ func removeInstance(w http.ResponseWriter, r *http.Request) {
 }
 
 func _removeInstance(InstanceId int) { //Run Async
-	var NewInstanceTimeLeft int64 = 0 //Force typecast
+	var NewInstanceTimeout int64 = 0 //Force typecast
 
 	entry := ds.InstanceMap[InstanceId]
-	entry.InstanceTimeLeft = NewInstanceTimeLeft //Make sure that the instance will be killed in the next kill cycle
+	entry.Instance_Timeout = NewInstanceTimeout //Make sure that the instance will be killed in the next kill cycle
 	ds.InstanceMap[InstanceId] = entry
 
 	a, b := ds.InstanceQueue.GetKey(InstanceId)
@@ -160,7 +161,7 @@ func _removeInstance(InstanceId int) { //Run Async
 		panic("InstanceId is missing in InstanceQueue!")
 	}
 	ds.InstanceQueue.Remove(a)
-	ds.InstanceQueue.Put(NewInstanceTimeLeft, InstanceId) //Replace
+	ds.InstanceQueue.Put(NewInstanceTimeout, InstanceId) //Replace
 
 	//No need to update DB since it will be removed anyways...
 }
@@ -189,7 +190,7 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request) {
 
 	InstanceId := ds.ActiveUserInstance[userid]
 
-	fmt.Fprint(w, strconv.FormatInt((ds.InstanceMap[InstanceId].InstanceTimeLeft-time.Now().UnixNano())/1e9, 10))
+	fmt.Fprint(w, strconv.FormatInt((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9, 10))
 }
 
 func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
@@ -221,8 +222,8 @@ func _extendTimeLeft(userid int) { //Run Async
 	InstanceId := ds.ActiveUserInstance[userid]
 	entry := ds.InstanceMap[InstanceId]
 
-	NewInstanceTimeLeft := entry.InstanceTimeLeft + ds.DefaultNanosecondsPerInstance
-	entry.InstanceTimeLeft = NewInstanceTimeLeft
+	NewInstanceTimeout := entry.Instance_Timeout + ds.DefaultNanosecondsPerInstance
+	entry.Instance_Timeout = NewInstanceTimeout
 	ds.InstanceMap[InstanceId] = entry
 
 	a, b := ds.InstanceQueue.GetKey(InstanceId)
@@ -230,9 +231,9 @@ func _extendTimeLeft(userid int) { //Run Async
 		panic("InstanceId is missing in InstanceQueue!")
 	}
 	ds.InstanceQueue.Remove(a)
-	ds.InstanceQueue.Put(NewInstanceTimeLeft, InstanceId) //Replace
+	ds.InstanceQueue.Put(NewInstanceTimeout, InstanceId) //Replace
 
-	api_sql.UpdateInstanceTime(InstanceId, NewInstanceTimeLeft)
+	api_sql.UpdateInstanceTime(InstanceId, NewInstanceTimeout)
 }
 
 func addChallenge(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +314,7 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 func _addChallengeDockerCompose(challenge_name string, docker_compose_file string) { //Run Async
 	port_count := yaml.DockerComposePortCount(docker_compose_file)
 	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, true, port_count)
-	ch := ds.Challenge{ChallengeId: challenge_id, ChallengeName: challenge_name, DockerCompose: true, PortCount: port_count, DockerComposeFile: docker_compose_file}
+	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Docker_Compose: true, Port_Count: port_count, Docker_Compose_File: docker_compose_file}
 	api_sql.UpdateChallenge(ch)
 
 	ds.ChallengeMap[challenge_id] = ch
@@ -321,7 +322,7 @@ func _addChallengeDockerCompose(challenge_name string, docker_compose_file strin
 
 func _addChallengeNonDockerCompose(challenge_name string, internal_port string, image_name string, docker_cmds string) { //Run Async
 	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, false, 1)
-	ch := ds.Challenge{ChallengeId: challenge_id, ChallengeName: challenge_name, DockerCompose: false, PortCount: 1, InternalPort: internal_port, ImageName: image_name, DockerCmds: api_sql.DeserializeNL(docker_cmds)}
+	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Docker_Compose: false, Port_Count: 1, Internal_Port: internal_port, Image_Name: image_name, Docker_Cmds: docker_cmds}
 	api_sql.UpdateChallenge(ch)
 
 	ds.ChallengeMap[challenge_id] = ch

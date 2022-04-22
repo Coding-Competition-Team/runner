@@ -1,156 +1,90 @@
 package api_sql
 
 import (
-	"database/sql"
-
-	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/gorm"
 
 	"runner/internal/ds"
 )
 
-func AddInstance(InstanceId int, userid int, challid string, InstanceTimeLeft int64, Ports []int) {
-	db, err := sql.Open("mysql", GetSqlDataSource())
+//instance needs Instance_Id, Usr_Id, Challenge_Id, Instance_Timeout, Ports_Used
+func AddInstance(Instance ds.Instance) {
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	stmt, err := db.Prepare("INSERT INTO instances (instance_id, usr_id, challenge_id, instance_timeout, ports_used) VALUES(?, ?, ?, ?, ?)")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-
-	serialized_ports := SerializeI(Ports, ",")
-	_, err = stmt.Exec(InstanceId, userid, challid, InstanceTimeLeft, serialized_ports)
-	if err != nil {
-		panic(err)
-	}
+	db.Create(&Instance)
 }
 
-func DeleteInstance(InstanceId int) {
-	db, err := sql.Open("mysql", GetSqlDataSource())
+func DeleteInstance(Instance_Id int) {
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	stmt, err := db.Prepare("DELETE FROM instances WHERE instance_id = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(InstanceId)
-	if err != nil {
-		panic(err)
-	}
+	db.Delete(&ds.Instance{}, Instance_Id)
 }
 
-func SetInstancePortainerId(InstanceId int, PortainerId string) {
-	db, err := sql.Open("mysql", GetSqlDataSource())
+func SetInstancePortainerId(Instance_Id int, Portainer_Id string) {
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	stmt, err := db.Prepare("UPDATE instances SET portainer_id = ? WHERE instance_id = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(PortainerId, InstanceId)
-	if err != nil {
-		panic(err)
-	}
+	db.Model(&ds.Instance{}).Where("instance_id = ?", Instance_Id).Update("portainer_id", Portainer_Id)
 }
 
-func UpdateInstanceTime(InstanceId int, NewInstanceTimeLeft int64) {
-	db, err := sql.Open("mysql", GetSqlDataSource())
+func UpdateInstanceTime(Instance_Id int, New_Instance_Timeout int64) {
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	stmt, err := db.Prepare("UPDATE instances SET instance_timeout = ? WHERE instance_id = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(NewInstanceTimeLeft, InstanceId)
-	if err != nil {
-		panic(err)
-	}
+	db.Model(&ds.Instance{}).Where("instance_id = ?", Instance_Id).Update("instance_timeout", New_Instance_Timeout)
 }
 
-func GetOrCreateChallengeId(challenge_name string, docker_compose bool, port_count int) string {
-	challenge_id := getChallengeId(challenge_name)
+func GetOrCreateChallengeId(Challenge_Name string, Docker_Compose bool, Port_Count int) string {
+	challenge_id := getChallengeId(Challenge_Name)
 
 	if challenge_id != "" {
 		return challenge_id
 	}
 
-	db, err := sql.Open("mysql", GetSqlDataSource()) //If control reaches here, the challenge does not exist in the DB
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	stmt, err := db.Prepare("INSERT INTO challenges (challenge_id, challenge_name, docker_compose, port_count) VALUES (?, ?, ?, ?)")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(ds.GenerateChallengeId(challenge_name), challenge_name, docker_compose, port_count)
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{}) //If control reaches here, the challenge does not exist in the DB
 	if err != nil {
 		panic(err)
 	}
 
-	return getChallengeId(challenge_name)
+	challenge := ds.Challenge{Challenge_Id: ds.GenerateChallengeId(Challenge_Name), Challenge_Name: Challenge_Name, Docker_Compose: Docker_Compose, Port_Count: Port_Count}
+	db.Create(&challenge)
+
+	return getChallengeId(Challenge_Name)
 }
 
 func getChallengeId(challenge_name string) string {
-	db, err := sql.Open("mysql", GetSqlDataSource())
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	stmt, err := db.Prepare("SELECT challenge_id FROM challenges WHERE challenge_name = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
+	ch := ds.Challenge{}
+	result := db.Select("challenge_id").Where("challenge_name = ?", challenge_name).Find(&ch)
 
-	var challenge_id string
-	err = stmt.QueryRow(challenge_name).Scan(&challenge_id)
-	if err == sql.ErrNoRows {
+	err = result.Error
+	if err == gorm.ErrRecordNotFound {
 		return ""
 	} else if err != nil {
 		panic(err)
 	}
-	
-	return challenge_id //Assume there are no duplicate challenge names
+
+	return ch.Challenge_Id //Assume there are no duplicate challenge names
 }
 
 func UpdateChallenge(ch ds.Challenge) {
-	db, err := sql.Open("mysql", GetSqlDataSource())
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	stmt, err := db.Prepare("UPDATE challenges SET docker_compose = ?, port_count = ?, internal_port = ?, image_name = ?, docker_cmds = ?, docker_compose_file = ? WHERE challenge_id = ?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(ch.DockerCompose, ch.PortCount, ch.InternalPort, ch.ImageName, Serialize(ch.DockerCmds, "\n"), ch.DockerComposeFile, ch.ChallengeId)
-	if err != nil {
-		panic(err)
-	}
+	db.Model(&ds.Challenge{}).Updates(ch)
 }

@@ -1,88 +1,47 @@
 package api_sql
 
 import (
-	"database/sql"
-	"strconv"
-
-	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/gorm"
 
 	"runner/internal/ds"
 	"runner/internal/log"
 )
 
 func syncChallenges() {
-	db, err := sql.Open("mysql", GetSqlDataSource())
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	rows, err := db.Query("SELECT challenge_id, challenge_name, docker_compose, port_count, internal_port, image_name, docker_cmds, docker_compose_file FROM challenges") //Get currently registered challenges in the DB
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
+	challenges := []ds.Challenge{}
+	db.Find(&challenges)
 
-	for rows.Next() {
-		var challenge_id string
-		var challenge_name string
-		var docker_compose bool
-		var port_count int
-		var internal_port string
-		var image_name string
-		var docker_cmds string
-		var docker_compose_file string
-
-		if err := rows.Scan(&challenge_id, &challenge_name, &docker_compose, &port_count, &internal_port, &image_name, &docker_cmds, &docker_compose_file); err != nil {
-			panic(err)
-		}
-
-		ch := ds.Challenge{ChallengeId: challenge_id, ChallengeName: challenge_name, DockerCompose: docker_compose, PortCount: port_count, InternalPort: internal_port, ImageName: image_name, DockerCmds: DeserializeNL(docker_cmds), DockerComposeFile: docker_compose_file}
-		ds.ChallengeMap[challenge_id] = ch
+	for _, ch := range challenges {
+		ds.ChallengeMap[ch.Challenge_Id] = ch
 	}
 }
 
 func syncInstances() {
-	db, err := sql.Open("mysql", GetSqlDataSource())
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
 
-	rows, err := db.Query("SELECT * FROM instances") //Fully trust DB
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
+	instances := []ds.Instance{}
+	db.Find(&instances) //Fully trust DB
 
-	for rows.Next() {
-		var instance_id int
-		var usr_id int
-		var challenge_id string
-		var portainer_id string
-		var instance_timeout int64
-		var ports_used string
-		if err := rows.Scan(&instance_id, &usr_id, &challenge_id, &portainer_id, &instance_timeout, &ports_used); err != nil {
-			panic(err)
+	for _, instance := range instances {
+		if (instance.Instance_Id + 1) > ds.NextInstanceId {
+			ds.NextInstanceId = instance.Instance_Id + 1
 		}
+		ds.ActiveUserInstance[instance.Usr_Id] = instance.Instance_Id
+		ds.InstanceQueue.Put(instance.Instance_Timeout, instance.Instance_Id)
 
-		if (instance_id + 1) > ds.NextInstanceId {
-			ds.NextInstanceId = instance_id + 1
-		}
-		ds.ActiveUserInstance[usr_id] = instance_id
-		ds.InstanceQueue.Put(instance_timeout, instance_id)
-
-		var ports []int
-		deserialized_ports := Deserialize(ports_used, ",")
-		for _, v := range deserialized_ports {
-			port, err := strconv.Atoi(v)
-			if err != nil {
-				panic(err)
-			}
-			ports = append(ports, port)
+		deserialized_ports := DeserializeI(instance.Ports_Used)
+		for _, port := range deserialized_ports {
 			ds.UsedPorts[port] = true
 		}
-		ds.InstanceMap[instance_id] = ds.InstanceData{UserId: usr_id, ChallengeId: challenge_id, InstanceTimeLeft: instance_timeout, PortainerId: portainer_id, Ports: ports}
+		ds.InstanceMap[instance.Instance_Id] = instance
 	}
 }
 

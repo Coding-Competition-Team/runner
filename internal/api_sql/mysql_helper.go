@@ -4,6 +4,9 @@ import (
 	"strconv"
 	"strings"
 
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
 	"runner/internal/creds"
 )
 
@@ -13,6 +16,19 @@ func Deserialize(str string, delim string) []string {
 
 func DeserializeNL(str string) []string {
 	return strings.Split(strings.ReplaceAll(str, "\r\n", "\n"), "\n")
+}
+
+func DeserializeI(str string) []int {
+	var arr []int
+	deserialized_ports := Deserialize(str, ",")
+	for _, v := range deserialized_ports {
+		element, err := strconv.Atoi(v)
+		if err != nil {
+			panic(err)
+		}
+		arr = append(arr, element)
+	}
+	return arr
 }
 
 func Serialize(dat []string, delim string) string {
@@ -37,6 +53,6 @@ func SerializeI(dat []int, delim string) string {
 	return str
 }
 
-func GetSqlDataSource() string {
-	return creds.MySQLUsername+":"+creds.MySQLPassword+"@tcp("+creds.MySQLIP+")/runner_db"
+func GetSqlDataSource() gorm.Dialector {
+	return postgres.Open("host="+creds.MySQLIP+" user="+creds.MySQLUsername+" password="+creds.MySQLPassword+" dbname=runner_db")
 }
