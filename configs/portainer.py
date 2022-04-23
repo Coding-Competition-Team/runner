@@ -1,9 +1,9 @@
+import base64
 import logging
 import os
-import regex
 import subprocess
 
-import base64
+import regex
 import requests
 import yaml
 
