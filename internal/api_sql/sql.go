@@ -86,5 +86,7 @@ func UpdateChallenge(ch ds.Challenge) {
 		panic(err)
 	}
 
-	db.Model(&ds.Challenge{}).Updates(ch)
+	if db.Model(&ch).Where("challenge_id = ?", ch.Challenge_Id).Updates(&ch).RowsAffected == 0 {
+		panic("Updating challenge that does not exist")
+	}
 }

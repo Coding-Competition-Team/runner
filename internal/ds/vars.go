@@ -2,6 +2,7 @@ package ds
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"math/rand"
 
 	"github.com/emirpasic/gods/maps/treebidimap"
@@ -16,7 +17,7 @@ var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, 
 var UsedPorts map[int]bool = make(map[int]bool)
 
 var MaxInstanceCount int //From Config
-var NextInstanceId int = 1
+var NextInstanceId int = 0
 var DefaultSecondsPerInstance int64 //From Config
 var DefaultNanosecondsPerInstance int64 //Indirectly From Config
 
@@ -25,7 +26,7 @@ var ChallengeMap map[string]Challenge = make(map[string]Challenge) //Challenge I
 func GenerateChallengeId(challenge_name string) string {
 	h := sha256.New()
 	h.Write([]byte(challenge_name))
-	return string(h.Sum(nil))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 var PS string = "/"

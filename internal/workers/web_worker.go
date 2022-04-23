@@ -39,6 +39,8 @@ func validateChallid(challid string) bool {
 }
 
 func addInstance(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /addInstance Request")
+
 	params := r.URL.Query()
 
 	_userid := params["userid"]
@@ -88,13 +90,14 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 }
 
 func _addInstance(userid int, challid string, Ports []int) { //Run Async
+	log.Debug("Start /addInstance Request")
 	InstanceId := ds.NextInstanceId
 	ds.NextInstanceId++
 	ds.ActiveUserInstance[userid] = InstanceId
 	InstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
 	ds.InstanceQueue.Put(InstanceTimeout, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
-	instance := ds.Instance{Usr_Id: userid, Challenge_Id: challid, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
+	instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
 	ds.InstanceMap[InstanceId] = instance
 
 	api_sql.AddInstance(instance)
@@ -116,9 +119,12 @@ func _addInstance(userid int, challid string, Ports []int) { //Run Async
 	ds.InstanceMap[InstanceId] = entry //Update PortainerId once it's available
 
 	api_sql.SetInstancePortainerId(InstanceId, PortainerId)
+	log.Debug("Finish /addInstance Request")
 }
 
 func removeInstance(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /removeInstance Request")
+
 	params := r.URL.Query()
 
 	_userid := params["userid"]
@@ -150,6 +156,7 @@ func removeInstance(w http.ResponseWriter, r *http.Request) {
 }
 
 func _removeInstance(InstanceId int) { //Run Async
+	log.Debug("Start /removeInstance Request")
 	var NewInstanceTimeout int64 = 0 //Force typecast
 
 	entry := ds.InstanceMap[InstanceId]
@@ -164,9 +171,12 @@ func _removeInstance(InstanceId int) { //Run Async
 	ds.InstanceQueue.Put(NewInstanceTimeout, InstanceId) //Replace
 
 	//No need to update DB since it will be removed anyways...
+	log.Debug("Finish /removeInstance Request")
 }
 
 func getTimeLeft(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /getTimeLeft Request")
+
 	params := r.URL.Query()
 
 	_userid := params["userid"]
@@ -188,12 +198,18 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Debug("Start /getTimeLeft Request")
+
 	InstanceId := ds.ActiveUserInstance[userid]
 
 	fmt.Fprint(w, strconv.FormatInt((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9, 10))
+
+	log.Debug("Finish /getTimeLeft Request")
 }
 
 func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /extendTimeLeft Request")
+
 	params := r.URL.Query()
 
 	_userid := params["userid"]
@@ -219,6 +235,7 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
 }
 
 func _extendTimeLeft(userid int) { //Run Async
+	log.Debug("Start /extendTimeLeft Request")
 	InstanceId := ds.ActiveUserInstance[userid]
 	entry := ds.InstanceMap[InstanceId]
 
@@ -234,9 +251,12 @@ func _extendTimeLeft(userid int) { //Run Async
 	ds.InstanceQueue.Put(NewInstanceTimeout, InstanceId) //Replace
 
 	api_sql.UpdateInstanceTime(InstanceId, NewInstanceTimeout)
+	log.Debug("Finish /extendTimeLeft Request")
 }
 
 func addChallenge(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /addChallenge Request")
+
 	auth := r.Header.Get("Authorization")
 
 	if auth == "" {
@@ -312,18 +332,22 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 }
 
 func _addChallengeDockerCompose(challenge_name string, docker_compose_file string) { //Run Async
+	log.Debug("Start /addChallenge Request (Docker Compose)")
 	port_count := yaml.DockerComposePortCount(docker_compose_file)
 	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, true, port_count)
 	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Docker_Compose: true, Port_Count: port_count, Docker_Compose_File: docker_compose_file}
 	api_sql.UpdateChallenge(ch)
 
 	ds.ChallengeMap[challenge_id] = ch
+	log.Debug("Finish /addChallenge Request (Docker Compose)")
 }
 
 func _addChallengeNonDockerCompose(challenge_name string, internal_port string, image_name string, docker_cmds string) { //Run Async
+	log.Debug("Start /addChallenge Request (Non Docker Compose)")
 	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, false, 1)
 	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Docker_Compose: false, Port_Count: 1, Internal_Port: internal_port, Image_Name: image_name, Docker_Cmds: docker_cmds}
 	api_sql.UpdateChallenge(ch)
 
 	ds.ChallengeMap[challenge_id] = ch
+	log.Debug("Finish /addChallenge Request (Non Docker Compose)")
 }
