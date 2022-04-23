@@ -7,6 +7,24 @@ type ConfigJson struct {
 	Reserved_Ports               []int
 }
 
+type PostgresqlJson struct {
+	Ip       string
+	Username string
+	Password string
+}
+
+type PortainerJson struct {
+	Url      string
+	Username string
+	Password string
+}
+
+type CredentialsJson struct {
+	Postgresql_Credentials PostgresqlJson
+	Portainer_Credentials  PortainerJson
+	Api_Authorization      string
+}
+
 type Instance struct {
 	Instance_Id      int
 	Usr_Id           int

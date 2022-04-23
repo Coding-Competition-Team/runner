@@ -12,9 +12,9 @@ import (
 	"runner/internal/log"
 )
 
-var MySQLIP string = ""
-var MySQLUsername string = ""
-var MySQLPassword string = ""
+var PostgreSQLIP string = ""
+var PostgreSQLUsername string = ""
+var PostgreSQLPassword string = ""
 
 var PortainerURL string = ""
 var PortainerUsername string = ""
@@ -30,18 +30,18 @@ func LoadCredentials() {
 		panic(err)
 	}
 
-	var result map[string]map[string]string
+	var result ds.CredentialsJson
 	json.Unmarshal(json_data, &result)
 
-	MySQLIP = result["mysql"]["ip"]
-	MySQLUsername = result["mysql"]["username"]
-	MySQLPassword = result["mysql"]["password"]
+	PostgreSQLIP = result.Postgresql_Credentials.Ip
+	PostgreSQLUsername = result.Postgresql_Credentials.Username
+	PostgreSQLPassword = result.Postgresql_Credentials.Password
 
-	PortainerURL = result["portainer"]["url"]
-	PortainerUsername = result["portainer"]["username"]
-	PortainerPassword = result["portainer"]["password"]
+	PortainerURL = result.Portainer_Credentials.Url
+	PortainerUsername = result.Portainer_Credentials.Username
+	PortainerPassword = result.Portainer_Credentials.Password
 
-	APIAuthorization = result["api"]["authorization"]
+	APIAuthorization = result.Api_Authorization
 
 	PortainerJWT = getPortainerJWT()
 	log.Info("Credentials Loaded!")

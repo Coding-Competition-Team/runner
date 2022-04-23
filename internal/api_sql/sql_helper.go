@@ -54,5 +54,5 @@ func SerializeI(dat []int, delim string) string {
 }
 
 func GetSqlDataSource() gorm.Dialector {
-	return postgres.Open("host="+creds.MySQLIP+" user="+creds.MySQLUsername+" password="+creds.MySQLPassword+" dbname=runner_db")
+	return postgres.Open("host="+creds.PostgreSQLIP+" user="+creds.PostgreSQLUsername+" password="+creds.PostgreSQLPassword+" dbname=runner_db")
 }
