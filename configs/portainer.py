@@ -10,25 +10,26 @@ import yaml
 
 
 # -----------------------------------------
-# --- config vars (change as necessary) --- 
+# --- config vars (change as necessary) ---
 # -----------------------------------------
+DRYRUN = False
 DEBUG = True
-runner_endpoint = 'http://localhost'
-runner_pw = os.getenv('API_AUTH', 'foobar')
+runner_endpoint = 'http://localhost:10000'
+runner_pw = os.getenv('API_AUTH', 'vNze6y7Fked8PBtsUTeyy8gw')
 
 
 
 # --- logging config ---
-if DEBUG:
-    logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
+if DRYRUN or DEBUG:
+    logging.basicConfig(level=logging.DEBUG)
 else:
-    logging.basicConfig(encoding='utf-8', level=logging.INFO)
+    logging.basicConfig(level=logging.INFO)
 
-# --- global vars --- 
+# --- global vars ---
 CTFs = []
 challenges = []
 
-# --- build docker-compose.yml and send data to runner endpoint --- 
+# --- build docker-compose.yml and send data to runner endpoint ---
 def docker_compose(challenge, chall_data, dir, env):
     # Reject composes with local volumes
     for service in chall_data['services']:
@@ -43,7 +44,7 @@ def docker_compose(challenge, chall_data, dir, env):
 
     # Build docker-compose
     logging.info(f'Building {challenge}...')
-    docker = subprocess.run([f'docker-compose', 'build'], cwd=dir, stdout=subprocess.PIPE, env=env) 
+    docker = subprocess.run([f'docker-compose', 'build'], cwd=dir, stdout=subprocess.PIPE, env=env)
     try:
         for stdout_line in iter(docker.stdout.readline, ""):
             print('| ' + stdout_line)
@@ -54,7 +55,7 @@ def docker_compose(challenge, chall_data, dir, env):
         return
     else:
         logging.info(f'{challenge} built successfully')
-    
+
     # Create new docker-compose
     new_compose = chall_data
     for service, data in chall_data['services'].items():
@@ -63,7 +64,7 @@ def docker_compose(challenge, chall_data, dir, env):
     new_compose = bytes(yaml.dump(new_compose), 'utf-8')
 
     # Send data to runner
-    headers = { 
+    headers = {
             'Authorization': runner_pw
     }
     payload = {
@@ -71,11 +72,11 @@ def docker_compose(challenge, chall_data, dir, env):
             'docker_compose': 'True',
             'docker_compose_file': bytes.decode(base64.b64encode(new_compose)),
     }
-    if DEBUG != True:
+    if not DRYRUN:
         r = requests.post(f'{runner_endpoint}/addChallenge', headers=headers, json=payload)
         if r.status_code != 200:
             logging.warning(f'Runner down? {r.content}')
-    else:
+    if DEBUG:
         logging.debug(f'{headers},{payload}')
     logging.info(f'{challenge} deployed successfully')
     return
@@ -89,10 +90,10 @@ def dockerfile(challenge, chall_data, dir, env):
         return
     else:
         port = port.group(1)
-    
+
     # Build image
     logging.info(f'Building {challenge}...')
-    docker = subprocess.run([f'docker', 'build', '--tag', f'{challenge}', '.'], cwd=dir, stdout=subprocess.PIPE, env=env) 
+    docker = subprocess.run([f'docker', 'build', '--tag', f'{challenge}', '.'], cwd=dir, stdout=subprocess.PIPE, env=env)
     try:
         for stdout_line in iter(docker.stdout.readline, ""):
             print('| ' + stdout_line)
@@ -105,7 +106,7 @@ def dockerfile(challenge, chall_data, dir, env):
         logging.info(f'{challenge} built successfully')
 
     # Send data to runner
-    headers = { 
+    headers = {
             'Authorization': runner_pw
     }
     payload = {
@@ -114,16 +115,16 @@ def dockerfile(challenge, chall_data, dir, env):
             'internal_port': port,
             'image_name': challenge,
     }
-    if DEBUG != True:
+    if not DRYRUN:
         r = requests.post(f'{runner_endpoint}/addChallenge', headers=headers, json=payload)
         if r.status_code != 200:
             logging.warning(f'Runner down? {r.content}')
-    else:
+    if DEBUG:
         logging.debug(f'{headers},{payload}')
     logging.info(f'{challenge} deployed successfully')
     return
 
-# --- main --- 
+# --- main ---
 def main():
     # TODO: 1 thread per challenge to speed up building
     # Scan for challenges
@@ -139,7 +140,7 @@ def main():
         # Cache challenge directory
         dir = os.path.join('.', challenge)
 
-        # Check for docker-compose.yml 
+        # Check for docker-compose.yml
         try:
             with open(os.path.join(dir, 'docker-compose.yml')) as file:
                 chall_data = yaml.safe_load(file)
