@@ -1,5 +1,12 @@
 package ds
 
+type ConfigJson struct {
+	Runner_Port                  int
+	Max_Instance_Count           int
+	Default_Seconds_Per_Instance int64
+	Reserved_Ports               []int
+}
+
 type Instance struct {
 	Instance_Id      int
 	Usr_Id           int

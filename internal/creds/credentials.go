@@ -25,7 +25,7 @@ var APIAuthorization string = ""
 
 func LoadCredentials() {
 	log.Info("Loading Credentials...")
-	json_data, err := os.ReadFile(ds.CredentialsJsonFile)
+	json_data, err := os.ReadFile(ds.ConfigFolderPath+ds.PS+ds.CredentialsFileName)
 	if err != nil {
 		panic(err)
 	}
