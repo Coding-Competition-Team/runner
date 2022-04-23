@@ -32,7 +32,7 @@ var PS string = "/"
 var CredentialsFileName string = "credentials.json"
 var ConfigFileName string = "config.json"
 
-var ConfigFolderPath string = ""
+var ConfigFolderPath string //From args
 
 func GetRandomPort() int { //Returns an (unused) random port from [1024, 65536)
 	for {
