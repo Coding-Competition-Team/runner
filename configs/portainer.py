@@ -80,10 +80,52 @@ def docker_compose(challenge, chall_data, dir, env):
     logging.info(f'{challenge} deployed successfully')
     return
 
+# --- build Dockerfile and send data to runner endpoint
+def dockerfile(challenge, chall_data, dir, env):
+    # Grab port from Dockerfile
+    port = regex.search('EXPOSE ([0-9]+)', chall_data)
+    if port == None:
+        logging.warning(f'{challenge} has no EXPOSE line in Dockerfile, skipping')
+        return
+    else:
+        port = port.group(1)
+    
+    # Build image
+    logging.info(f'Building {challenge}...')
+    docker = subprocess.run([f'docker', 'build', '--tag', f'{challenge}', '.'], cwd=dir, stdout=subprocess.PIPE, env=env) 
+    try:
+        for stdout_line in iter(docker.stdout.readline, ""):
+            print('| ' + stdout_line)
+    except AttributeError:
+        pass
+    if docker.returncode != 0:
+        logging.warning(f'An error occured while building {challenge}. {bytes.decode(docker.stderr, "utf-8")}')
+        return
+    else:
+        logging.info(f'{challenge} built successfully')
+
+    # Send data to runner
+    headers = { 
+            'Authorization': runner_pw
+    }
+    payload = {
+            'challenge_name': challenge,
+            'docker_compose': 'False',
+            'internal_port': port,
+            'image_name': challenge,
+    }
+    if DEBUG != True:
+        r = requests.post(f'{runner_endpoint}/addChallenge', headers=headers, json=payload)
+        if r.status_code != 200:
+            logging.warning(f'Runner down? {r.content}')
+    else:
+        logging.debug(f'{headers},{payload}')
+    logging.info(f'{challenge} deployed successfully')
+    return
 
 # --- main --- 
 def main():
-    # TODO: 1 thread per challenge to speed up composing
+    # TODO: 1 thread per challenge to speed up building
     # Scan for challenges
     with os.scandir() as scan:
         for i in scan:
@@ -101,11 +143,18 @@ def main():
         try:
             with open(os.path.join(dir, 'docker-compose.yml')) as file:
                 chall_data = yaml.safe_load(file)
-        except:
-            logging.warning(f'{challenge} has no docker-compose, skipping')
-            continue
+        except FileNotFoundError:
+            # logging.warning(f'{challenge} has no docker-compose, skipping')
+            # continue
+            try:
+                with open(os.path.join(dir, 'Dockerfile')) as file:
+                    chall_data = file.read()
+            except FileNotFoundError:
+                logging.warning(f'{challenge} has no docker-compose or Dockerfile, skipping')
+            else:
+                dockerfile(challenge, chall_data, dir, env)
         else:
-            result = docker_compose(challenge, chall_data, dir, env)
+            docker_compose(challenge, chall_data, dir, env)
 
 if __name__ == '__main__':
     main()
