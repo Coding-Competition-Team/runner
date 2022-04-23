@@ -26,6 +26,7 @@ That's it really.
      * Missing/Invalid `userID`
      * Mising/Invalid `challID`
      * User has already deployed a challenge (only one challenge per user at any one time)
+     * Max number of instances has been reached
 
   * `removeInstance`
     * Removes an Instance for a specific user
@@ -69,8 +70,9 @@ That's it really.
     * `internal_port`: Dockerfile Exposed Port
     * `image_name`: Image name of built Docker image
     * `docker_compose_file`: Docker Compose file that is **compatible with Portainer Stacks** and **base64 encoded**
-  * For Dockerfiles, only `challenge_name`, `docker_compose='False'`, `internal_port` and `image_name` are required.
-  * For Docker Compose, only `challegne_name`, `docker_compose='True'` and `docker_compose_file` are required.
+  * `challenge_name`, `docker_compose=` are compulsory
+  * For Dockerfiles, `internal_port` and `image_name` are also required.
+  * For Docker Compose, `docker_compose_file` is also required.
   * Errors:
     * JSON Invalid
     * Missing/Invalid `docker_compose` value
