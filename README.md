@@ -1,5 +1,5 @@
 # Runner 
-Runner is meant to simply deployment of isolated challenges during a CTF. Runner utlises Portainer to deploy challenges and allows the deployment of isolated challenges. Isolated challenges are challegnes unique to each user. 
+Runner is meant to simplify deployment of isolated challenges during a CTF. Runner utlises Portainer to deploy challenges and allows the deployment of isolated challenges. Isolated challenges are challegnes unique to each user. 
 
 Features:
 - Deploy isolated challenges
