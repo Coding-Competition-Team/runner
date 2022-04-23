@@ -14,8 +14,8 @@ import yaml
 # -----------------------------------------
 DRYRUN = False
 DEBUG = True
-runner_endpoint = 'http://localhost:10000'
-runner_pw = os.getenv('API_AUTH', 'vNze6y7Fked8PBtsUTeyy8gw')
+runner_endpoint = 'http://localhost:10000' #change ports as needed
+runner_pw = os.getenv('API_AUTH', 'vNze6y7Fked8PBtsUTeyy8gw')  #example password
 
 
 
