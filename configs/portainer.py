@@ -14,8 +14,8 @@ import yaml
 # -----------------------------------------
 DRYRUN = False
 DEBUG = True
-runner_endpoint = 'http://localhost:10000' #change ports as needed
-runner_pw = os.getenv('API_AUTH', 'vNze6y7Fked8PBtsUTeyy8gw')  #example password
+runner_endpoint = 'http://localhost:10000'
+runner_pw = os.getenv('API_AUTH', 'vNze6y7Fked8PBtsUTeyy8gw')
 
 
 
@@ -60,7 +60,7 @@ def docker_compose(challenge, chall_data, dir, env):
     new_compose = chall_data
     for service, data in chall_data['services'].items():
         new_compose['services'][service].pop('build', 0)
-        new_compose['services'][service]['image'] = f'{challenge}_{service}'
+        new_compose['services'][service]['image'] = f'{challenge.lower()}_{service.lower()}'
     new_compose = bytes(yaml.dump(new_compose), 'utf-8')
 
     # Send data to runner
@@ -68,7 +68,7 @@ def docker_compose(challenge, chall_data, dir, env):
             'Authorization': runner_pw
     }
     payload = {
-            'challenge_name': challenge,
+            'challenge_name': challenge.lower(),
             'docker_compose': 'True',
             'docker_compose_file': bytes.decode(base64.b64encode(new_compose)),
     }
@@ -110,10 +110,10 @@ def dockerfile(challenge, chall_data, dir, env):
             'Authorization': runner_pw
     }
     payload = {
-            'challenge_name': challenge,
+            'challenge_name': challenge.lower(),
             'docker_compose': 'False',
             'internal_port': port,
-            'image_name': challenge,
+            'image_name': challenge.lower(),
     }
     if not DRYRUN:
         r = requests.post(f'{runner_endpoint}/addChallenge', headers=headers, json=payload)
