@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"runner/internal/ds"
+	"runner/internal/log"
 )
 
 var MySQLIP string = ""
@@ -23,6 +24,7 @@ var PortainerJWT string = ""
 var APIAuthorization string = ""
 
 func LoadCredentials() {
+	log.Info("Loading Credentials...")
 	json_data, err := os.ReadFile(ds.CredentialsJsonFile)
 	if err != nil {
 		panic(err)
@@ -42,6 +44,7 @@ func LoadCredentials() {
 	APIAuthorization = result["api"]["authorization"]
 
 	PortainerJWT = getPortainerJWT()
+	log.Info("Credentials Loaded!")
 }
 
 func getPortainerJWT() string {
