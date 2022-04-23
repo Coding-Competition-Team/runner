@@ -36,7 +36,7 @@ func ReserveDefaultPorts() {
 	UsedPorts[RunnerPort] = true //Runner
 	UsedPorts[8000] = true       //Portainer
 	UsedPorts[9443] = true       //Portainer
-	UsedPorts[3306] = true       //Runner DB
+	UsedPorts[5432] = true       //Runner DB
 	UsedPorts[22] = true         //SSH
 }
 
