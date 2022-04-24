@@ -24,6 +24,7 @@ func HandleRequests() {
 	http.HandleFunc("/getTimeLeft", getTimeLeft)
 	http.HandleFunc("/extendTimeLeft", extendTimeLeft)
 	http.HandleFunc("/addChallenge", addChallenge)
+	http.HandleFunc("/getStatus", getStatus)
 	http_log.Fatal(http.ListenAndServe(":" + strconv.Itoa(ds.RunnerPort), nil))
 }
 
@@ -35,6 +36,11 @@ func validateUserid(userid int) bool {
 
 func validateChallid(challid string) bool {
 	_, ok := ds.ChallengeMap[challid]
+	return ok
+}
+
+func activeUserInstance(userid int) bool {
+	_, ok := ds.ActiveUserInstance[userid]
 	return ok
 }
 
@@ -68,7 +74,7 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ds.ActiveUserInstance[userid] > 0 {
+	if activeUserInstance(userid) {
 		http.Error(w, "User is already running an instance", http.StatusForbidden)
 		return
 	}
@@ -141,7 +147,7 @@ func removeInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ds.ActiveUserInstance[userid] <= 0 {
+	if !activeUserInstance(userid) {
 		http.Error(w, "User does not have an instance", http.StatusForbidden)
 		return
 	}
@@ -193,7 +199,7 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ds.ActiveUserInstance[userid] <= 0 {
+	if !activeUserInstance(userid) {
 		http.Error(w, "User does not have an instance", http.StatusForbidden)
 		return
 	}
@@ -226,7 +232,7 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ds.ActiveUserInstance[userid] <= 0 {
+	if !activeUserInstance(userid) {
 		http.Error(w, "User does not have an instance", http.StatusForbidden)
 		return
 	}
@@ -350,4 +356,27 @@ func _addChallengeNonDockerCompose(challenge_name string, internal_port string, 
 
 	ds.ChallengeMap[challenge_id] = ch
 	log.Debug("Finish /addChallenge Request (Non Docker Compose)")
+}
+
+func getStatus(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /getStatus Request")
+
+	auth := r.Header.Get("Authorization")
+
+	if auth == "" {
+		http.Error(w, "Authorization missing", http.StatusBadRequest)
+		return
+	} else if auth != creds.APIAuthorization { //TODO: Make this comparison secure
+		http.Error(w, "Invalid authorization", http.StatusBadRequest)
+		return
+	}
+
+	log.Debug("Start /getStatus Request")
+
+	fmt.Fprintln(w, len(ds.InstanceMap), "/", ds.MaxInstanceCount)
+	for _, instance := range ds.InstanceMap {
+		fmt.Fprintf(w, "%+v\n", instance)
+	}
+
+	log.Debug("Finish /getStatus Request")
 }
