@@ -5,7 +5,7 @@ Features:
 - Deploy isolated challenges
 - Time limit for deployed challenges
 - Supports multiple Portainer servers (in future)
-- 
+
 ## Config and Credentials
 More details are provided in /config
 
