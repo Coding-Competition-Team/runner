@@ -12,16 +12,16 @@ import (
 	"runner/internal/log"
 )
 
-var PostgreSQLIP string = ""
-var PostgreSQLUsername string = ""
-var PostgreSQLPassword string = ""
+var PostgreSQLUrl string
+var PostgreSQLUsername string
+var PostgreSQLPassword string
 
-var PortainerURL string = ""
-var PortainerUsername string = ""
-var PortainerPassword string = ""
-var PortainerJWT string = ""
+var PortainerURL string
+var PortainerUsername string
+var PortainerPassword string
+var PortainerJWT string
 
-var APIAuthorization string = ""
+var APIAuthorization string
 
 func LoadCredentials() {
 	log.Info("Loading Credentials...")
@@ -33,7 +33,7 @@ func LoadCredentials() {
 	var result ds.CredentialsJson
 	json.Unmarshal(json_data, &result)
 
-	PostgreSQLIP = result.Postgresql_Credentials.Ip
+	PostgreSQLUrl = result.Postgresql_Credentials.Url
 	PostgreSQLUsername = result.Postgresql_Credentials.Username
 	PostgreSQLPassword = result.Postgresql_Credentials.Password
 
