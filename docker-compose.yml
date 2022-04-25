@@ -10,7 +10,7 @@ services:
       POSTGRES_DB: runner_db #dont change this
     volumes:
       - dbdata:/var/lib/postgresql/data
-      - ./init:/docker-entrypoint-initdb.d
+      - ./init:/docker-entrypoint-initdb.d 
   runner:
     container_name: runner
     build:
