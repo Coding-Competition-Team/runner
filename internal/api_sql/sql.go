@@ -97,5 +97,5 @@ func DeleteChallenge(challid string) {
 		panic(err)
 	}
 
-	db.Delete(&ds.Challenge{}, challid)
+	db.Delete(&ds.Challenge{}, ds.Challenge{Challenge_Id: challid}) //For some reason, db.Delete(&ds.Challenge{}, challid) does not seem to work
 }

@@ -106,7 +106,7 @@ func _addInstance(userid int, challid string, Ports []int) { //Run Async
 	ds.ActiveUserInstance[userid] = InstanceId
 	InstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
 	ds.InstanceQueue.Put(InstanceTimeout, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
-	discriminant := strconv.FormatInt(time.Now().Unix(), 10)
+	discriminant := strconv.FormatInt(time.Now().UnixNano(), 10)
 	instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
 	ds.InstanceMap[InstanceId] = instance
 
