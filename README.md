@@ -37,13 +37,12 @@ That's it really.
       * User does not have an instance running
       * User's Instance is still starting
 
-  * `getTimeLeft`
-    * Gets time left for a specific user's instance.
-    * `/getTimeLeft?userid=XXXX`
+  * `getUserStatus`
+    * Gets the time left and challenge id for a specific user's instance (if available).
+    * `/getUserStatus?userid=XXXX`
     * `userid` must be a valid userid
     * Errors:
       * Missing/Invalid `userID`
-      * User does not have an instance running
 
   * `extendTimeLeft`
     * Extends the time left for a specific user's instance.
@@ -87,6 +86,15 @@ That's it really.
         * Invalid base64 for `docker_cmds`
       * For Portainer Stack,
         * Missing/Invalid base64 for `docker_compose_file`
+
+  * `removeChallenge`
+    * Removes a challenge.
+    * `removeChallenge?challId=XXXX`
+    * `challId` must be a valid challId
+    * Requires authorization header!
+    * Errors:
+      * Missing/Invalid Authorization header
+      * Missing/Invalid `challID`
 
   * `getStatus`
     * Prints the current status of the runner (number of instances running, details of current instances, etc.)

@@ -21,7 +21,7 @@ import (
 func HandleRequests() {
 	http.HandleFunc("/addInstance", addInstance)
 	http.HandleFunc("/removeInstance", removeInstance)
-	http.HandleFunc("/getTimeLeft", getTimeLeft)
+	http.HandleFunc("/getUserStatus", getUserStatus)
 	http.HandleFunc("/extendTimeLeft", extendTimeLeft)
 	http.HandleFunc("/addChallenge", addChallenge)
 	http.HandleFunc("/removeChallenge", removeChallenge)
@@ -184,8 +184,8 @@ func _removeInstance(InstanceId int) { //Run Async
 	log.Debug("Finish /removeInstance Request")
 }
 
-func getTimeLeft(w http.ResponseWriter, r *http.Request) {
-	log.Debug("Received /getTimeLeft Request")
+func getUserStatus(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /getUserStatus Request")
 
 	params := r.URL.Query()
 
@@ -204,17 +204,17 @@ func getTimeLeft(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !activeUserInstance(userid) {
-		http.Error(w, "User does not have an instance", http.StatusForbidden)
+		fmt.Fprint(w, ds.UserStatus{Running_Instance: false}.ToString())
 		return
 	}
 
-	log.Debug("Start /getTimeLeft Request")
+	log.Debug("Start /getUserStatus Request")
 
 	InstanceId := ds.ActiveUserInstance[userid]
 
-	fmt.Fprint(w, strconv.FormatInt((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9, 10))
+	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9)}.ToString())
 
-	log.Debug("Finish /getTimeLeft Request")
+	log.Debug("Finish /getUserStatus Request")
 }
 
 func extendTimeLeft(w http.ResponseWriter, r *http.Request) {

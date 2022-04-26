@@ -23,6 +23,12 @@ type CredentialsJson struct {
 	Api_Authorization      string
 }
 
+type UserStatus struct {
+	Running_Instance bool
+	Challenge_Id     string
+	Time_Left        int
+}
+
 type Instance struct {
 	Instance_Id      int
 	Usr_Id           int
@@ -47,8 +53,16 @@ type Challenge struct {
 	Docker_Compose_File string
 }
 
+func (status UserStatus) ToString() string {
+	statusJson, err := json.Marshal(status) //No need to pretty print
+    if err != nil {
+        panic(err)
+    }
+	return string(statusJson)
+}
+
 func (instance Instance) ToString() string {
-	instanceJson, err := json.MarshalIndent(instance, "", "  ")
+	instanceJson, err := json.MarshalIndent(instance, "", "  ") //Pretty print
     if err != nil {
         panic(err)
     }
@@ -56,7 +70,7 @@ func (instance Instance) ToString() string {
 }
 
 func (challenge Challenge) ToString() string {
-	challengeJson, err := json.MarshalIndent(challenge, "", "  ")
+	challengeJson, err := json.MarshalIndent(challenge, "", "  ") //Pretty print
     if err != nil {
         panic(err)
     }
