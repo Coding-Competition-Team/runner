@@ -67,32 +67,39 @@ func (w *Worker) Shutdown() {
 // Action defines what the worker does; override this.
 // For now we'll just wait two seconds and print to simulate work.
 func (w *Worker) Action() {
-	log.Info("Current Instances:")
-	it := ds.InstanceQueue.Iterator()
+	ClearInstanceQueue() //TODO: Handle timeout/race condition
+}
+
+// Clears the current InstanceQueue for all instances with timestamp <= current_timestamp
+func ClearInstanceQueue(){
 	current_timestamp := time.Now().UnixNano()
+	log.Info("Kill Worker", current_timestamp)
 
-	for it.Next() { //Sorted by time
+	for !ds.InstanceQueue.Empty() {
+		it := ds.InstanceQueue.Iterator()
+		it.Next()
 		timestamp, InstanceId := it.Key().(int64), it.Value().(int)
-		if timestamp <= current_timestamp {
-			api_sql.DeleteInstance(InstanceId)
+		log.Info("Clearing Instance", InstanceId)
 
-			PortainerId := ds.InstanceMap[InstanceId].Portainer_Id
-			if ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Docker_Compose {
-				api_portainer.DeleteStack(PortainerId)
-			} else {
-				api_portainer.DeleteContainer(PortainerId)
-			}
-
-			UserId := ds.InstanceMap[InstanceId].Usr_Id
-			ds.InstanceQueue.Remove(timestamp)
-			for _, v := range api_sql.DeserializeI(ds.InstanceMap[InstanceId].Ports_Used) {
-				delete(ds.UsedPorts, v)
-			}
-			delete(ds.InstanceMap, InstanceId)
-			delete(ds.ActiveUserInstance, UserId)
-
-			break //Only handle 1 instance a time to prevent tree iterator nonsense
+		if timestamp > current_timestamp {
+			break
 		}
-		log.Info(timestamp, ":", InstanceId)
+
+		api_sql.DeleteInstance(InstanceId)
+
+		PortainerId := ds.InstanceMap[InstanceId].Portainer_Id
+		if ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Docker_Compose {
+			api_portainer.DeleteStack(PortainerId)
+		} else {
+			api_portainer.DeleteContainer(PortainerId)
+		}
+
+		UserId := ds.InstanceMap[InstanceId].Usr_Id
+		ds.InstanceQueue.Remove(timestamp)
+		for _, v := range api_sql.DeserializeI(ds.InstanceMap[InstanceId].Ports_Used) {
+			delete(ds.UsedPorts, v)
+		}
+		delete(ds.InstanceMap, InstanceId)
+		delete(ds.ActiveUserInstance, UserId)
 	}
 }

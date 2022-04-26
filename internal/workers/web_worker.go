@@ -402,7 +402,7 @@ func _removeChallenge(challid string) { //Run Async
 		}
 	}
 
-	time.Sleep(time.Minute) //Wait for kill_worker to kill instances, TODO improve
+	ClearInstanceQueue() //Manually trigger ClearInstanceQueue() rather than waiting for the Kill Worker
 
 	api_sql.DeleteChallenge(challid)
 
