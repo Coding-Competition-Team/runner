@@ -24,6 +24,7 @@ func HandleRequests() {
 	http.HandleFunc("/getTimeLeft", getTimeLeft)
 	http.HandleFunc("/extendTimeLeft", extendTimeLeft)
 	http.HandleFunc("/addChallenge", addChallenge)
+	http.HandleFunc("/removeChallenge", removeChallenge)
 	http.HandleFunc("/getStatus", getStatus)
 	http_log.Fatal(http.ListenAndServe(":" + strconv.Itoa(ds.RunnerPort), nil))
 }
@@ -36,7 +37,10 @@ func validateUserid(userid int) bool {
 
 func validateChallid(challid string) bool {
 	_, ok := ds.ChallengeMap[challid]
-	return ok
+	if ok { //If challid exists in ChallengeMap, check if it is not unsafe to launch
+		return !ds.ChallengeUnsafeToLaunch[challid]
+	}
+	return false //challid does not exist in ChallengeMap
 }
 
 func activeUserInstance(userid int) bool {
@@ -358,6 +362,56 @@ func _addChallengeNonDockerCompose(challenge_name string, internal_port string, 
 	log.Debug("Finish /addChallenge Request (Non Docker Compose)")
 }
 
+func removeChallenge(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /removeChallenge Request")
+
+	auth := r.Header.Get("Authorization")
+
+	if auth == "" {
+		http.Error(w, "Authorization missing", http.StatusBadRequest)
+		return
+	} else if auth != creds.APIAuthorization { //TODO: Make this comparison secure
+		http.Error(w, "Invalid authorization", http.StatusBadRequest)
+		return
+	}
+
+	params := r.URL.Query()
+
+	_challid := params["challid"]
+	if len(_challid) == 0 {
+		http.Error(w, "Missing challid", http.StatusForbidden)
+		return
+	}
+	challid := _challid[0]
+	if !validateChallid(challid) {
+		http.Error(w, "Invalid challid", http.StatusForbidden)
+		return
+	}
+
+	go _removeChallenge(challid)
+}
+
+func _removeChallenge(challid string) { //Run Async
+	log.Debug("Start /removeChallenge Request")
+
+	ds.ChallengeUnsafeToLaunch[challid] = true; //Mark challenge as unsafe to launch
+
+	for _, instance := range ds.InstanceMap {
+		if instance.Challenge_Id == challid {
+			go _removeInstance(instance.Instance_Id) //Make sure that all instances running this challenge are killed
+		}
+	}
+
+	time.Sleep(time.Minute) //Wait for kill_worker to kill instances, TODO improve
+
+	api_sql.DeleteChallenge(challid)
+
+	delete(ds.ChallengeMap, challid)
+	delete(ds.ChallengeUnsafeToLaunch, challid)
+
+	log.Debug("Finish /removeChallenge Request")
+}
+
 func getStatus(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Received /getStatus Request")
 
@@ -373,9 +427,14 @@ func getStatus(w http.ResponseWriter, r *http.Request) {
 
 	log.Debug("Start /getStatus Request")
 
-	fmt.Fprintln(w, len(ds.InstanceMap), "/", ds.MaxInstanceCount)
+	fmt.Fprintln(w, "Instance Count:", len(ds.InstanceMap), "/", ds.MaxInstanceCount)
+	fmt.Fprintln(w, "Current Instances:")
 	for _, instance := range ds.InstanceMap {
-		fmt.Fprintf(w, "%+v\n", instance)
+		fmt.Fprintln(w, instance.ToString())
+	}
+	fmt.Fprintln(w, "Current Challenges:")
+	for _, challenge := range ds.ChallengeMap {
+		fmt.Fprintln(w, challenge.ToString())
 	}
 
 	log.Debug("Finish /getStatus Request")

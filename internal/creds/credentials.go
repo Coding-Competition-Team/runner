@@ -74,5 +74,9 @@ func getPortainerJWT() string {
 		panic(err)
 	}
 
+	if raw["jwt"] == "" {
+		panic("Invalid Portainer credentials")
+	}
+
 	return raw["jwt"]
 }

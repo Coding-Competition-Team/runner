@@ -90,3 +90,12 @@ func UpdateChallenge(ch ds.Challenge) {
 		panic("Updating challenge that does not exist")
 	}
 }
+
+func DeleteChallenge(challid string) {
+	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+
+	db.Delete(&ds.Challenge{}, challid)
+}

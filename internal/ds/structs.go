@@ -1,5 +1,9 @@
 package ds
 
+import (
+	"encoding/json"
+)
+
 type ConfigJson struct {
 	Runner_Port                  int
 	Max_Instance_Count           int
@@ -41,4 +45,20 @@ type Challenge struct {
 
 	//For DockerCompose = true:
 	Docker_Compose_File string
+}
+
+func (instance Instance) ToString() string {
+	instanceJson, err := json.MarshalIndent(instance, "", "  ")
+    if err != nil {
+        panic(err)
+    }
+	return string(instanceJson)
+}
+
+func (challenge Challenge) ToString() string {
+	challengeJson, err := json.MarshalIndent(challenge, "", "  ")
+    if err != nil {
+        panic(err)
+    }
+	return string(challengeJson)
 }
