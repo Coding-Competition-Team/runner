@@ -31,7 +31,7 @@ func HandleRequests() {
 
 //fmt.Fprintf() - print to web
 
-func validateUserid(userid int) bool {
+func validateUserid(userid string) bool {
 	return true
 }
 
@@ -43,7 +43,7 @@ func validateChallid(challid string) bool {
 	return false //challid does not exist in ChallengeMap
 }
 
-func activeUserInstance(userid int) bool {
+func activeUserInstance(userid string) bool {
 	_, ok := ds.ActiveUserInstance[userid]
 	return ok
 }
@@ -58,10 +58,8 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing userid", http.StatusForbidden)
 		return
 	}
-	userid, err := strconv.Atoi(_userid[0])
-	if err != nil {
-		panic(err)
-	}
+	userid := _userid[0]
+
 	if !validateUserid(userid) {
 		http.Error(w, "Invalid userid", http.StatusForbidden)
 		return
@@ -99,7 +97,7 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 	go _addInstance(userid, challid, Ports)
 }
 
-func _addInstance(userid int, challid string, Ports []int) { //Run Async
+func _addInstance(userid string, challid string, Ports []int) { //Run Async
 	log.Debug("Start /addInstance Request")
 	InstanceId := ds.NextInstanceId
 	ds.NextInstanceId++
@@ -142,10 +140,8 @@ func removeInstance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing userid", http.StatusForbidden)
 		return
 	}
-	userid, err := strconv.Atoi(_userid[0])
-	if err != nil {
-		panic(err)
-	}
+	userid := _userid[0]
+
 	if !validateUserid(userid) {
 		http.Error(w, "Invalid userid", http.StatusForbidden)
 		return
@@ -194,10 +190,8 @@ func getUserStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing userid", http.StatusForbidden)
 		return
 	}
-	userid, err := strconv.Atoi(_userid[0])
-	if err != nil {
-		panic(err)
-	}
+	userid := _userid[0]
+
 	if !validateUserid(userid) {
 		http.Error(w, "Invalid userid", http.StatusForbidden)
 		return
@@ -227,10 +221,8 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing userid", http.StatusForbidden)
 		return
 	}
-	userid, err := strconv.Atoi(_userid[0])
-	if err != nil {
-		panic(err)
-	}
+	userid := _userid[0]
+
 	if !validateUserid(userid) {
 		http.Error(w, "Invalid userid", http.StatusForbidden)
 		return
@@ -244,7 +236,7 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
 	go _extendTimeLeft(userid)
 }
 
-func _extendTimeLeft(userid int) { //Run Async
+func _extendTimeLeft(userid string) { //Run Async
 	log.Debug("Start /extendTimeLeft Request")
 	InstanceId := ds.ActiveUserInstance[userid]
 	entry := ds.InstanceMap[InstanceId]

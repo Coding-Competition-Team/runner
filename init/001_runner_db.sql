@@ -11,7 +11,7 @@ CREATE TABLE challenges (
 
 CREATE TABLE instances (
 	instance_id SERIAL PRIMARY KEY,
-	usr_id int NOT NULL,
+	usr_id varchar(64) NOT NULL,
 	challenge_id varchar(64) NOT NULL,
 	portainer_id varchar(64) NOT NULL DEFAULT '',
 	instance_timeout bigint NOT NULL,

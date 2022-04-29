@@ -35,7 +35,7 @@ type UserStatus struct {
 
 type Instance struct {
 	Instance_Id      int
-	Usr_Id           int
+	Usr_Id           string
 	Challenge_Id     string
 	Portainer_Id     string
 	Instance_Timeout int64 //Unix (Nano) Timestamp of Instance Timeout

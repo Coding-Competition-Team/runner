@@ -11,7 +11,7 @@ import (
 
 var RunnerPort int //From Config
 
-var ActiveUserInstance map[int]int = make(map[int]int)                                               //UserId -> InstanceId
+var ActiveUserInstance map[string]int = make(map[string]int)                                         //UserId -> InstanceId
 var InstanceMap map[int]Instance = make(map[int]Instance)                                            //InstanceId -> Instance
 var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator) //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
 var UsedPorts map[int]bool = make(map[int]bool)
