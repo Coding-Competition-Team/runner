@@ -27,8 +27,10 @@ type CredentialsJson struct {
 
 type UserStatus struct {
 	Running_Instance bool
-	Challenge_Id     string
+	Challenge_Name   string
 	Time_Left        int
+	IP_Address       string
+	Ports_Used       string
 }
 
 type Instance struct {

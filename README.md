@@ -38,7 +38,7 @@ That's it really.
       * User's Instance is still starting
 
   * `getUserStatus`
-    * Gets the time left and challenge id for a specific user's instance (if available).
+    * Gets the time left, challenge info, etc. for a specific user's instance (if available).
     * `/getUserStatus?userid=XXXX`
     * `userid` must be a valid userid
     * Errors:
