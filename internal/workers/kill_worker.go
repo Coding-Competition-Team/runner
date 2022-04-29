@@ -79,11 +79,12 @@ func ClearInstanceQueue(){
 		it := ds.InstanceQueue.Iterator()
 		it.Next()
 		timestamp, InstanceId := it.Key().(int64), it.Value().(int)
-		log.Info("Clearing Instance", InstanceId)
 
 		if timestamp > current_timestamp {
 			break
 		}
+		
+		log.Info("Clearing Instance", InstanceId)
 
 		api_sql.DeleteInstance(InstanceId)
 
