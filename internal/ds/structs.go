@@ -9,6 +9,8 @@ type ConfigJson struct {
 	Max_Instance_Count           int
 	Default_Seconds_Per_Instance int64
 	Reserved_Ports               []int
+	Database_Max_Retry_Attempts  int
+	Database_Error_Wait_Seconds  int
 }
 
 type ThirdPartyCredentialsJson struct {

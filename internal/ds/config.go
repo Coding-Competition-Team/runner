@@ -25,5 +25,7 @@ func LoadConfig() {
 	for _, port := range result.Reserved_Ports {
 		UsedPorts[port] = true
 	}
+	Database_Max_Retry_Attempts = result.Database_Max_Retry_Attempts
+	Database_Error_Wait_Seconds = result.Database_Error_Wait_Seconds
 	log.Info("Config Loaded!")
 }

@@ -24,6 +24,9 @@ var DefaultNanosecondsPerInstance int64 //Indirectly From Config
 var ChallengeMap map[string]Challenge = make(map[string]Challenge) //Challenge ID -> Challenges
 var ChallengeUnsafeToLaunch map[string]bool = make(map[string]bool) //Challenges may become unsafe to launch when they are marked for removal via /removeChallenge
 
+var Database_Max_Retry_Attempts int //From Config
+var Database_Error_Wait_Seconds int //From Config
+
 func GenerateChallengeId(challenge_name string) string {
 	h := sha256.New()
 	h.Write([]byte(challenge_name))

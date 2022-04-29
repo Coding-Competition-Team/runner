@@ -3,12 +3,13 @@ package api_sql
 import (
 	"gorm.io/gorm"
 
+	"runner/internal/creds"
 	"runner/internal/ds"
 )
 
 //instance needs Instance_Id, Usr_Id, Challenge_Id, Instance_Timeout, Ports_Used
 func AddInstance(Instance ds.Instance) {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -17,7 +18,7 @@ func AddInstance(Instance ds.Instance) {
 }
 
 func DeleteInstance(Instance_Id int) {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -26,7 +27,7 @@ func DeleteInstance(Instance_Id int) {
 }
 
 func SetInstancePortainerId(Instance_Id int, Portainer_Id string) {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -35,7 +36,7 @@ func SetInstancePortainerId(Instance_Id int, Portainer_Id string) {
 }
 
 func UpdateInstanceTime(Instance_Id int, New_Instance_Timeout int64) {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -50,7 +51,7 @@ func GetOrCreateChallengeId(Challenge_Name string, Docker_Compose bool, Port_Cou
 		return challenge_id
 	}
 
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{}) //If control reaches here, the challenge does not exist in the DB
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{}) //If control reaches here, the challenge does not exist in the DB
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +63,7 @@ func GetOrCreateChallengeId(Challenge_Name string, Docker_Compose bool, Port_Cou
 }
 
 func getChallengeId(challenge_name string) string {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -81,7 +82,7 @@ func getChallengeId(challenge_name string) string {
 }
 
 func UpdateChallenge(ch ds.Challenge) {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -92,7 +93,7 @@ func UpdateChallenge(ch ds.Challenge) {
 }
 
 func DeleteChallenge(challid string) {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}

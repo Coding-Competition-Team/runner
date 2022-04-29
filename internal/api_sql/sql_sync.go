@@ -3,12 +3,13 @@ package api_sql
 import (
 	"gorm.io/gorm"
 
+	"runner/internal/creds"
 	"runner/internal/ds"
 	"runner/internal/log"
 )
 
 func syncChallenges() {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -22,7 +23,7 @@ func syncChallenges() {
 }
 
 func syncInstances() {
-	db, err := gorm.Open(GetSqlDataSource(), &gorm.Config{})
+	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}

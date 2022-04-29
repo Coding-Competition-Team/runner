@@ -3,11 +3,6 @@ package api_sql
 import (
 	"strconv"
 	"strings"
-
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-
-	"runner/internal/creds"
 )
 
 func Deserialize(str string, delim string) []string {
@@ -51,8 +46,4 @@ func SerializeI(dat []int, delim string) string {
 		}
 	}
 	return str
-}
-
-func GetSqlDataSource() gorm.Dialector {
-	return postgres.Open("host="+creds.PostgreSQLUrl+" user="+creds.PostgreSQLUsername+" password="+creds.PostgreSQLPassword+" dbname=runner_db")
 }
