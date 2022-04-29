@@ -25,6 +25,14 @@ type CredentialsJson struct {
 	Api_Authorization      string
 }
 
+type Error struct {
+	Error string
+}
+
+type PortsJson struct {
+	Ports_Used []int
+}
+
 type UserStatus struct {
 	Running_Instance bool
 	Challenge_Name   string
@@ -55,6 +63,22 @@ type Challenge struct {
 
 	//For DockerCompose = true:
 	Docker_Compose_File string
+}
+
+func (error Error) ToString() string {
+	statusJson, err := json.Marshal(error) //No need to pretty print
+    if err != nil {
+        panic(err)
+    }
+	return string(statusJson)
+}
+
+func (portsJson PortsJson) ToString() string {
+	statusJson, err := json.Marshal(portsJson) //No need to pretty print
+    if err != nil {
+        panic(err)
+    }
+	return string(statusJson)
 }
 
 func (status UserStatus) ToString() string {

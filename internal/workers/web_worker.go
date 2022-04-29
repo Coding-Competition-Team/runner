@@ -55,46 +55,48 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 
 	_userid := params["userid"]
 	if len(_userid) == 0 {
-		http.Error(w, "Missing userid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Missing userid"}.ToString(), http.StatusForbidden)
 		return
 	}
 	userid := _userid[0]
 
 	if !validateUserid(userid) {
-		http.Error(w, "Invalid userid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Invalid userid"}.ToString(), http.StatusForbidden)
 		return
 	}
 
 	_challid := params["challid"]
 	if len(_challid) == 0 {
-		http.Error(w, "Missing challid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Missing challid"}.ToString(), http.StatusForbidden)
 		return
 	}
 	challid := _challid[0]
 	if !validateChallid(challid) {
-		http.Error(w, "Invalid challid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Invalid challid"}.ToString(), http.StatusForbidden)
 		return
 	}
 
 	if activeUserInstance(userid) {
-		http.Error(w, "User is already running an instance", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "User is already running an instance"}.ToString(), http.StatusForbidden)
 		return
 	}
 
 	if len(ds.InstanceMap) >= ds.MaxInstanceCount { //Use >= instead of == just in case
-		http.Error(w, "The max number of instances for the platform has already been reached, try again later", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "The max number of instances for the platform has already been reached, try again later"}.ToString(), http.StatusForbidden)
 		return
 	}
 
 	ch := ds.ChallengeMap[challid]
 
-	Ports := make([]int, ch.Port_Count) //Cannot directly use [ch.PortCount]int
+	var ports ds.PortsJson
+	ports.Ports_Used = make([]int, ch.Port_Count) //Cannot directly use [ch.PortCount]int
 	for i := 0; i < ch.Port_Count; i++ {
-		Ports[i] = ds.GetRandomPort()
-		fmt.Fprintln(w, strconv.Itoa(Ports[i]))
+		ports.Ports_Used[i] = ds.GetRandomPort()
 	}
 
-	go _addInstance(userid, challid, Ports)
+	fmt.Fprint(w, ports.ToString())
+
+	go _addInstance(userid, challid, ports.Ports_Used)
 }
 
 func _addInstance(userid string, challid string, Ports []int) { //Run Async
@@ -137,24 +139,24 @@ func removeInstance(w http.ResponseWriter, r *http.Request) {
 
 	_userid := params["userid"]
 	if len(_userid) == 0 {
-		http.Error(w, "Missing userid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Missing userid"}.ToString(), http.StatusForbidden)
 		return
 	}
 	userid := _userid[0]
 
 	if !validateUserid(userid) {
-		http.Error(w, "Invalid userid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Invalid userid"}.ToString(), http.StatusForbidden)
 		return
 	}
 
 	if !activeUserInstance(userid) {
-		http.Error(w, "User does not have an instance", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "User does not have an instance"}.ToString(), http.StatusForbidden)
 		return
 	}
 
 	InstanceId := ds.ActiveUserInstance[userid]
 	if ds.InstanceMap[InstanceId].Portainer_Id == "" {
-		http.Error(w, "The instance is still starting", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "The instance is still starting"}.ToString(), http.StatusForbidden)
 		return
 	}
 
@@ -187,13 +189,13 @@ func getUserStatus(w http.ResponseWriter, r *http.Request) {
 
 	_userid := params["userid"]
 	if len(_userid) == 0 {
-		http.Error(w, "Missing userid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Missing userid"}.ToString(), http.StatusForbidden)
 		return
 	}
 	userid := _userid[0]
 
 	if !validateUserid(userid) {
-		http.Error(w, "Invalid userid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Invalid userid"}.ToString(), http.StatusForbidden)
 		return
 	}
 
@@ -218,18 +220,18 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
 
 	_userid := params["userid"]
 	if len(_userid) == 0 {
-		http.Error(w, "Missing userid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Missing userid"}.ToString(), http.StatusForbidden)
 		return
 	}
 	userid := _userid[0]
 
 	if !validateUserid(userid) {
-		http.Error(w, "Invalid userid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Invalid userid"}.ToString(), http.StatusForbidden)
 		return
 	}
 
 	if !activeUserInstance(userid) {
-		http.Error(w, "User does not have an instance", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "User does not have an instance"}.ToString(), http.StatusForbidden)
 		return
 	}
 
@@ -262,16 +264,16 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 	auth := r.Header.Get("Authorization")
 
 	if auth == "" {
-		http.Error(w, "Authorization missing", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Authorization missing"}.ToString(), http.StatusBadRequest)
 		return
 	} else if auth != creds.APIAuthorization { //TODO: Make this comparison secure
-		http.Error(w, "Invalid authorization", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Invalid authorization"}.ToString(), http.StatusBadRequest)
 		return
 	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Cannot read body", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Cannot read body"}.ToString(), http.StatusBadRequest)
 		return
 	}
 
@@ -280,29 +282,29 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 
 	challenge_name, ok := result["challenge_name"]
 	if !ok {
-		http.Error(w, "Missing challenge_name", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Missing challenge_name"}.ToString(), http.StatusBadRequest)
 		return
 	}
 	_docker_compose, ok := result["docker_compose"]
 	if !ok {
-		http.Error(w, "Missing docker_compose", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Missing docker_compose"}.ToString(), http.StatusBadRequest)
 		return
 	}
 	docker_compose, err := strconv.ParseBool(_docker_compose)
 	if err != nil {
-		http.Error(w, "Invalid docker_compose", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Invalid docker_compose"}.ToString(), http.StatusBadRequest)
 		return
 	}
 
 	if docker_compose {
 		_docker_compose_file, ok := result["docker_compose_file"]
 		if !ok {
-			http.Error(w, "Missing docker_compose_file", http.StatusBadRequest)
+			http.Error(w, ds.Error{Error: "Missing docker_compose_file"}.ToString(), http.StatusBadRequest)
 			return
 		}
 		docker_compose_file, err := base64.StdEncoding.DecodeString(_docker_compose_file)
 		if err != nil {
-			http.Error(w, "Invalid base64 encoding for docker_compose_file", http.StatusBadRequest)
+			http.Error(w, ds.Error{Error: "Invalid base64 encoding for docker_compose_file"}.ToString(), http.StatusBadRequest)
 			return
 		}
 
@@ -310,12 +312,12 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 	} else {
 		internal_port, ok := result["internal_port"]
 		if !ok {
-			http.Error(w, "Missing internal_port", http.StatusBadRequest)
+			http.Error(w, ds.Error{Error: "Missing internal_port"}.ToString(), http.StatusBadRequest)
 			return
 		}
 		image_name, ok := result["image_name"]
 		if !ok {
-			http.Error(w, "Missing image_name", http.StatusBadRequest)
+			http.Error(w, ds.Error{Error: "Missing image_name"}.ToString(), http.StatusBadRequest)
 			return
 		}
 
@@ -324,7 +326,7 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 		if ok { //docker_cmds is optional
 			docker_cmds, err = base64.StdEncoding.DecodeString(_docker_cmds)
 			if err != nil {
-				http.Error(w, "Invalid base64 encoding for docker_cmds", http.StatusBadRequest)
+				http.Error(w, ds.Error{Error: "Invalid base64 encoding for docker_cmds"}.ToString(), http.StatusBadRequest)
 				return
 			}
 		}
@@ -360,10 +362,10 @@ func removeChallenge(w http.ResponseWriter, r *http.Request) {
 	auth := r.Header.Get("Authorization")
 
 	if auth == "" {
-		http.Error(w, "Authorization missing", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Authorization missing"}.ToString(), http.StatusBadRequest)
 		return
 	} else if auth != creds.APIAuthorization { //TODO: Make this comparison secure
-		http.Error(w, "Invalid authorization", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Invalid authorization"}.ToString(), http.StatusBadRequest)
 		return
 	}
 
@@ -371,12 +373,12 @@ func removeChallenge(w http.ResponseWriter, r *http.Request) {
 
 	_challid := params["challid"]
 	if len(_challid) == 0 {
-		http.Error(w, "Missing challid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Missing challid"}.ToString(), http.StatusForbidden)
 		return
 	}
 	challid := _challid[0]
 	if !validateChallid(challid) {
-		http.Error(w, "Invalid challid", http.StatusForbidden)
+		http.Error(w, ds.Error{Error: "Invalid challid"}.ToString(), http.StatusForbidden)
 		return
 	}
 
@@ -410,10 +412,10 @@ func getStatus(w http.ResponseWriter, r *http.Request) {
 	auth := r.Header.Get("Authorization")
 
 	if auth == "" {
-		http.Error(w, "Authorization missing", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Authorization missing"}.ToString(), http.StatusBadRequest)
 		return
 	} else if auth != creds.APIAuthorization { //TODO: Make this comparison secure
-		http.Error(w, "Invalid authorization", http.StatusBadRequest)
+		http.Error(w, ds.Error{Error: "Invalid authorization"}.ToString(), http.StatusBadRequest)
 		return
 	}
 
