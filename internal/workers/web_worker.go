@@ -160,6 +160,8 @@ func removeInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Fprint(w, ds.Success{Success: true}.ToString())
+
 	go _removeInstance(InstanceId)
 }
 
@@ -235,6 +237,15 @@ func extendTimeLeft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	InstanceId := ds.ActiveUserInstance[userid]
+
+	if (ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9 > ds.MaxSecondsLeftBeforeExtendAllowed {
+		http.Error(w, ds.Error{Error: "User needs to wait until instance expires in " + strconv.FormatInt(ds.MaxSecondsLeftBeforeExtendAllowed, 10) + " seconds"}.ToString(), http.StatusForbidden)
+		return
+	}
+
+	fmt.Fprint(w, ds.Success{Success: true}.ToString())
+
 	go _extendTimeLeft(userid)
 }
 
@@ -243,7 +254,7 @@ func _extendTimeLeft(userid string) { //Run Async
 	InstanceId := ds.ActiveUserInstance[userid]
 	entry := ds.InstanceMap[InstanceId]
 
-	NewInstanceTimeout := entry.Instance_Timeout + ds.DefaultNanosecondsPerInstance
+	NewInstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
 	entry.Instance_Timeout = NewInstanceTimeout
 	ds.InstanceMap[InstanceId] = entry
 
@@ -308,6 +319,8 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		fmt.Fprint(w, ds.Success{Success: true}.ToString())
+
 		go _addChallengeDockerCompose(challenge_name, string(docker_compose_file))
 	} else {
 		internal_port, ok := result["internal_port"]
@@ -330,6 +343,8 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+
+		fmt.Fprint(w, ds.Success{Success: true}.ToString())
 
 		go _addChallengeNonDockerCompose(challenge_name, internal_port, image_name, string(docker_cmds))
 	}
@@ -381,6 +396,8 @@ func removeChallenge(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, ds.Error{Error: "Invalid challid"}.ToString(), http.StatusForbidden)
 		return
 	}
+
+	fmt.Fprint(w, ds.Success{Success: true}.ToString())
 
 	go _removeChallenge(challid)
 }

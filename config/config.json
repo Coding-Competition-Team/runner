@@ -2,6 +2,7 @@
 	"Runner_Port": 10000,
 	"Max_Instance_Count": 3,
 	"Default_Seconds_Per_Instance": 300,
+	"Max_Seconds_Left_Before_Extend_Allowed": 60,
 	"Reserved_Ports": [8000, 9443, 5432, 22],
 	"Database_Max_Retry_Attempts": 12,
 	"Database_Error_Wait_Seconds": 10

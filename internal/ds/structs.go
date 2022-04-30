@@ -5,12 +5,13 @@ import (
 )
 
 type ConfigJson struct {
-	Runner_Port                  int
-	Max_Instance_Count           int
-	Default_Seconds_Per_Instance int64
-	Reserved_Ports               []int
-	Database_Max_Retry_Attempts  int
-	Database_Error_Wait_Seconds  int
+	Runner_Port                            int
+	Max_Instance_Count                     int
+	Default_Seconds_Per_Instance           int64
+	Max_Seconds_Left_Before_Extend_Allowed int64
+	Reserved_Ports                         []int
+	Database_Max_Retry_Attempts            int
+	Database_Error_Wait_Seconds            int
 }
 
 type ThirdPartyCredentialsJson struct {
@@ -27,6 +28,10 @@ type CredentialsJson struct {
 
 type Error struct {
 	Error string
+}
+
+type Success struct {
+	Success bool
 }
 
 type PortsJson struct {
@@ -66,11 +71,19 @@ type Challenge struct {
 }
 
 func (error Error) ToString() string {
-	statusJson, err := json.Marshal(error) //No need to pretty print
+	errorJson, err := json.Marshal(error) //No need to pretty print
     if err != nil {
         panic(err)
     }
-	return string(statusJson)
+	return string(errorJson)
+}
+
+func (success Success) ToString() string {
+	successJson, err := json.Marshal(success) //No need to pretty print
+    if err != nil {
+        panic(err)
+    }
+	return string(successJson)
 }
 
 func (portsJson PortsJson) ToString() string {

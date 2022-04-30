@@ -51,6 +51,7 @@ That's it really.
     * Errors:
       * Missing/Invalid `userID`
       * User does not have an instance running
+      * User needs to wait until their instance is closer to the expiry time
 
   * `addChallenge`
     * Maps a challenge name to its Portainer Image **or** Stack.
