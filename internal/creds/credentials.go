@@ -16,13 +16,9 @@ import (
 	"runner/internal/log"
 )
 
-var PostgreSQLUrl string
-var PostgreSQLUsername string
-var PostgreSQLPassword string
+var PostgreSQLCreds ds.ThirdPartyCredentialsJson
 
-var PortainerURL string
-var PortainerUsername string
-var PortainerPassword string
+var PortainerCreds ds.ThirdPartyCredentialsJson
 var PortainerJWT string
 
 var APIAuthorization string
@@ -37,14 +33,8 @@ func LoadCredentials() {
 	var result ds.CredentialsJson
 	json.Unmarshal(json_data, &result)
 
-	PostgreSQLUrl = result.Postgresql_Credentials.Url
-	PostgreSQLUsername = result.Postgresql_Credentials.Username
-	PostgreSQLPassword = result.Postgresql_Credentials.Password
-
-	PortainerURL = result.Portainer_Credentials.Url
-	PortainerUsername = result.Portainer_Credentials.Username
-	PortainerPassword = result.Portainer_Credentials.Password
-
+	PostgreSQLCreds = result.Postgresql_Credentials
+	PortainerCreds = result.Portainer_Credentials
 	APIAuthorization = result.Api_Authorization
 
 	PortainerJWT = getPortainerJWT()
@@ -58,14 +48,14 @@ func getPortainerJWT() string {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //TODO: Remove
 
 	requestBody, err := json.Marshal(map[string]string{
-		"Username": PortainerUsername,
-		"Password": PortainerPassword,
+		"Username": PortainerCreds.Username,
+		"Password": PortainerCreds.Password,
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	resp, err := http.Post(PortainerURL+"/api/auth", "application/json", bytes.NewBuffer(requestBody))
+	resp, err := http.Post(PortainerCreds.Url+"/api/auth", "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		panic(err)
 	}
@@ -108,5 +98,5 @@ func testSqlConnection() {
 }
 
 func GetSqlDataSource() gorm.Dialector {
-	return postgres.Open("host="+PostgreSQLUrl+" user="+PostgreSQLUsername+" password="+PostgreSQLPassword+" dbname=runner_db")
+	return postgres.Open("host="+PostgreSQLCreds.Url+" user="+PostgreSQLCreds.Username+" password="+PostgreSQLCreds.Password+" dbname=runner_db")
 }

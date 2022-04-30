@@ -28,7 +28,7 @@ func LaunchContainer(container_name string, image_name string, cmds []string, in
 	requestBody := []byte(tmp)
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", creds.PortainerURL+"/api/endpoints/2/docker/containers/create?name="+container_name+"_"+discriminant, bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest("POST", creds.PortainerCreds.Url+"/api/endpoints/2/docker/containers/create?name="+container_name+"_"+discriminant, bytes.NewBuffer(requestBody))
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +63,7 @@ func startContainer(id string) {
 	requestBody := []byte("{}")
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", creds.PortainerURL+"/api/endpoints/2/docker/containers/"+id+"/start", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest("POST", creds.PortainerCreds.Url+"/api/endpoints/2/docker/containers/"+id+"/start", bytes.NewBuffer(requestBody))
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +86,7 @@ func startContainer(id string) {
 
 func DeleteContainer(id string) {
 	client := http.Client{}
-	req, err := http.NewRequest("DELETE", creds.PortainerURL+"/api/endpoints/2/docker/containers/"+id+"?force=true", nil)
+	req, err := http.NewRequest("DELETE", creds.PortainerCreds.Url+"/api/endpoints/2/docker/containers/"+id+"?force=true", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -119,7 +119,7 @@ func LaunchStack(stack_name string, docker_compose string, discriminant string) 
 	requestBody := []byte(tmp)
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", creds.PortainerURL+"/api/stacks?type=2&method=string&endpointId=2", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest("POST", creds.PortainerCreds.Url+"/api/stacks?type=2&method=string&endpointId=2", bytes.NewBuffer(requestBody))
 	if err != nil {
 		panic(err)
 	}
@@ -150,7 +150,7 @@ func LaunchStack(stack_name string, docker_compose string, discriminant string) 
 
 func DeleteStack(id string) {
 	client := http.Client{}
-	req, err := http.NewRequest("DELETE", creds.PortainerURL+"/api/stacks/"+id+"?endpointId=2", nil)
+	req, err := http.NewRequest("DELETE", creds.PortainerCreds.Url+"/api/stacks/"+id+"?endpointId=2", nil)
 	if err != nil {
 		panic(err)
 	}

@@ -210,7 +210,7 @@ func getUserStatus(w http.ResponseWriter, r *http.Request) {
 
 	InstanceId := ds.ActiveUserInstance[userid]
 
-	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Name: ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Challenge_Name, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), IP_Address: creds.PortainerURL, Ports_Used: ds.InstanceMap[InstanceId].Ports_Used}.ToString())
+	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Name: ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Challenge_Name, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), IP_Address: creds.PortainerCreds.Url, Ports_Used: ds.InstanceMap[InstanceId].Ports_Used}.ToString())
 
 	log.Debug("Finish /getUserStatus Request")
 }
