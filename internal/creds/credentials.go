@@ -18,8 +18,9 @@ import (
 
 var PostgreSQLCreds ds.ThirdPartyCredentialsJson
 
-var PortainerCreds ds.ThirdPartyCredentialsJson
-var PortainerJWT string
+var PortainerUrls []string
+var PortainerCreds map[string]ds.ThirdPartyCredentialsJson  = make(map[string]ds.ThirdPartyCredentialsJson) //PortainerUrl -> PortainerCredentials
+var PortainerJWT map[string]string = make(map[string]string)                                                //PortainerUrl -> PortainerJWT
 
 var APIAuthorization string
 
@@ -34,28 +35,34 @@ func LoadCredentials() {
 	json.Unmarshal(json_data, &result)
 
 	PostgreSQLCreds = result.Postgresql_Credentials
-	PortainerCreds = result.Portainer_Credentials
-	APIAuthorization = result.Api_Authorization
-
-	PortainerJWT = getPortainerJWT()
-
 	testSqlConnection()
+
+	if len(result.Portainer_Credentials) == 0 {
+		panic("Please specify at least 1 set of Portainer credentials")
+	}
+	for _, credentials := range result.Portainer_Credentials {
+		PortainerUrls = append(PortainerUrls, credentials.Url)
+		PortainerCreds[credentials.Url] = credentials
+		PortainerJWT[credentials.Url] = getPortainerJWT(credentials)
+	}
+
+	APIAuthorization = result.Api_Authorization
 
 	log.Info("Credentials Loaded!")
 }
 
-func getPortainerJWT() string {
+func getPortainerJWT(credentials ds.ThirdPartyCredentialsJson) string {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //TODO: Remove
 
 	requestBody, err := json.Marshal(map[string]string{
-		"Username": PortainerCreds.Username,
-		"Password": PortainerCreds.Password,
+		"Username": credentials.Username,
+		"Password": credentials.Password,
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	resp, err := http.Post(PortainerCreds.Url+"/api/auth", "application/json", bytes.NewBuffer(requestBody))
+	resp, err := http.Post(credentials.Url+"/api/auth", "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		panic(err)
 	}

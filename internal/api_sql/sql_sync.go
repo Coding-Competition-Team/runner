@@ -22,6 +22,11 @@ func syncChallenges() {
 	}
 }
 
+func validatePortainerUrl(url string) bool {
+	_, ok := creds.PortainerCreds[url]
+	return ok
+}
+
 func syncInstances() {
 	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
@@ -32,6 +37,10 @@ func syncInstances() {
 	db.Find(&instances) //Fully trust DB
 
 	for _, instance := range instances {
+		if !validatePortainerUrl(instance.Portainer_Url) {
+			panic("Instance " + instance.ToString() + "'s Portainer_Url is not specified in credentials")
+		}
+
 		if (instance.Instance_Id + 1) > ds.NextInstanceId {
 			ds.NextInstanceId = instance.Instance_Id + 1
 		}

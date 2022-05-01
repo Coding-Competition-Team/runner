@@ -22,7 +22,7 @@ type ThirdPartyCredentialsJson struct {
 
 type CredentialsJson struct {
 	Postgresql_Credentials ThirdPartyCredentialsJson
-	Portainer_Credentials  ThirdPartyCredentialsJson
+	Portainer_Credentials  []ThirdPartyCredentialsJson
 	Api_Authorization      string
 }
 
@@ -50,6 +50,7 @@ type Instance struct {
 	Instance_Id      int
 	Usr_Id           string
 	Challenge_Id     string
+	Portainer_Url    string
 	Portainer_Id     string
 	Instance_Timeout int64 //Unix (Nano) Timestamp of Instance Timeout
 	Ports_Used       string

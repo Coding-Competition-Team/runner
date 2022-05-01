@@ -107,7 +107,8 @@ func _addInstance(userid string, challid string, Ports []int) { //Run Async
 	InstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
 	ds.InstanceQueue.Put(InstanceTimeout, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().UnixNano(), 10)
-	instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
+	portainer_url := creds.GetBestPortainer()
+	instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Portainer_Url: portainer_url, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
 	ds.InstanceMap[InstanceId] = instance
 
 	api_sql.AddInstance(instance)
@@ -117,9 +118,9 @@ func _addInstance(userid string, challid string, Ports []int) { //Run Async
 	ch := ds.ChallengeMap[challid]
 	if ch.Docker_Compose {
 		new_docker_compose := yaml.DockerComposeCopy(ch.Docker_Compose_File, Ports)
-		PortainerId = api_portainer.LaunchStack(ch.Challenge_Name, new_docker_compose, discriminant)
+		PortainerId = api_portainer.LaunchStack(portainer_url, ch.Challenge_Name, new_docker_compose, discriminant)
 	} else {
-		PortainerId = api_portainer.LaunchContainer(ch.Challenge_Name, ch.Image_Name, api_sql.DeserializeNL(ch.Docker_Cmds), ch.Internal_Port, Ports[0], discriminant)
+		PortainerId = api_portainer.LaunchContainer(portainer_url, ch.Challenge_Name, ch.Image_Name, api_sql.DeserializeNL(ch.Docker_Cmds), ch.Internal_Port, Ports[0], discriminant)
 	}
 
 	log.Debug("Portainer ID:", PortainerId)
@@ -210,7 +211,7 @@ func getUserStatus(w http.ResponseWriter, r *http.Request) {
 
 	InstanceId := ds.ActiveUserInstance[userid]
 
-	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Name: ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Challenge_Name, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), IP_Address: creds.PortainerCreds.Url, Ports_Used: ds.InstanceMap[InstanceId].Ports_Used}.ToString())
+	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Name: ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Challenge_Name, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), IP_Address: ds.InstanceMap[InstanceId].Portainer_Url, Ports_Used: ds.InstanceMap[InstanceId].Ports_Used}.ToString())
 
 	log.Debug("Finish /getUserStatus Request")
 }

@@ -90,9 +90,9 @@ func ClearInstanceQueue(){
 
 		PortainerId := ds.InstanceMap[InstanceId].Portainer_Id
 		if ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Docker_Compose {
-			api_portainer.DeleteStack(PortainerId)
+			api_portainer.DeleteStack(ds.InstanceMap[InstanceId].Portainer_Url, PortainerId)
 		} else {
-			api_portainer.DeleteContainer(PortainerId)
+			api_portainer.DeleteContainer(ds.InstanceMap[InstanceId].Portainer_Url, PortainerId)
 		}
 
 		UserId := ds.InstanceMap[InstanceId].Usr_Id
