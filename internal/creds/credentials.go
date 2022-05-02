@@ -44,6 +44,7 @@ func LoadCredentials() {
 		PortainerUrls = append(PortainerUrls, credentials.Url)
 		PortainerCreds[credentials.Url] = credentials
 		PortainerJWT[credentials.Url] = getPortainerJWT(credentials)
+		AddPortainerQueue(0, credentials.Url)
 	}
 
 	APIAuthorization = result.Api_Authorization

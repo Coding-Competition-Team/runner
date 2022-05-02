@@ -28,6 +28,9 @@ var ChallengeUnsafeToLaunch map[string]bool = make(map[string]bool) //Challenges
 var Database_Max_Retry_Attempts int //From Config
 var Database_Error_Wait_Seconds int //From Config
 
+var PortainerBalanceStrategy string //From Config
+var PortainerBalanceStrategies []string = []string{"RANDOM", "DISTRIBUTE"}
+
 func GenerateChallengeId(challenge_name string) string {
 	h := sha256.New()
 	h.Write([]byte(challenge_name))

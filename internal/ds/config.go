@@ -7,6 +7,15 @@ import (
 	"runner/internal/log"
 )
 
+func validatePortainerBalanceStrategy(strategy string) bool {
+	for _, validStrategy := range PortainerBalanceStrategies {
+		if strategy == validStrategy {
+			return true
+		}
+	}
+	return false
+}
+
 func LoadConfig() {
 	log.Info("Loading Config...")
 	json_data, err := os.ReadFile(ConfigFolderPath+PS+ConfigFileName)
@@ -27,5 +36,9 @@ func LoadConfig() {
 	}
 	Database_Max_Retry_Attempts = result.Database_Max_Retry_Attempts
 	Database_Error_Wait_Seconds = result.Database_Error_Wait_Seconds
+	if !validatePortainerBalanceStrategy(result.Portainer_Balance_Strategy){
+		panic("Please specify a valid Portainer Balance Strategy")
+	}
+	PortainerBalanceStrategy = result.Portainer_Balance_Strategy
 	log.Info("Config Loaded!")
 }

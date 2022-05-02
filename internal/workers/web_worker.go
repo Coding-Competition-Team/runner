@@ -108,6 +108,12 @@ func _addInstance(userid string, challid string, Ports []int) { //Run Async
 	ds.InstanceQueue.Put(InstanceTimeout, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().UnixNano(), 10)
 	portainer_url := creds.GetBestPortainer()
+	if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
+		creds.RemovePortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
+		creds.PortainerInstanceCounts[portainer_url] += 1
+		creds.AddPortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
+	}
+
 	instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Portainer_Url: portainer_url, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
 	ds.InstanceMap[InstanceId] = instance
 
@@ -171,6 +177,14 @@ func _removeInstance(InstanceId int) { //Run Async
 	var NewInstanceTimeout int64 = 0 //Force typecast
 
 	entry := ds.InstanceMap[InstanceId]
+
+	portainer_url := entry.Portainer_Url
+	if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
+		creds.RemovePortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
+		creds.PortainerInstanceCounts[portainer_url] -= 1
+		creds.AddPortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
+	}
+
 	entry.Instance_Timeout = NewInstanceTimeout //Make sure that the instance will be killed in the next kill cycle
 	ds.InstanceMap[InstanceId] = entry
 

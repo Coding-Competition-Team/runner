@@ -10,6 +10,10 @@ For ``Reserved_Ports``,
 
 Note that the ``Runner_Port`` is automatically reserved.
 
+For ``Portainer_Balance_Strategy``, the following are possible options:
+- ``"RANDOM"``: Adds new instances randomly among all Portainer instances available.
+- ``"DISTRIBUTE"``: Distributes the load of new instances evenly among all Portainer instances available.
+
 ## Credentials
 
 In order for the runner to interface with the PostgreSQL DB and Portainer, credentials (IP/URL addresses, usernames, passwords, etc.) need to be provided.

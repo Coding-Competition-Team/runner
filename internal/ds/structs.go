@@ -12,6 +12,7 @@ type ConfigJson struct {
 	Reserved_Ports                         []int
 	Database_Max_Retry_Attempts            int
 	Database_Error_Wait_Seconds            int
+	Portainer_Balance_Strategy             string
 }
 
 type ThirdPartyCredentialsJson struct {
