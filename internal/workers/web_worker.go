@@ -93,13 +93,15 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < ch.Port_Count; i++ {
 		ports.Ports_Used[i] = ds.GetRandomPort()
 	}
+	portainer_url := creds.GetBestPortainer()
+	ports.Host = creds.ExtractHost(portainer_url)
 
 	fmt.Fprint(w, ports.ToString())
 
-	go _addInstance(userid, challid, ports.Ports_Used)
+	go _addInstance(userid, challid, portainer_url, ports.Ports_Used)
 }
 
-func _addInstance(userid string, challid string, Ports []int) { //Run Async
+func _addInstance(userid string, challid string, portainer_url string, Ports []int) { //Run Async
 	log.Debug("Start /addInstance Request")
 	InstanceId := ds.NextInstanceId
 	ds.NextInstanceId++
@@ -107,7 +109,6 @@ func _addInstance(userid string, challid string, Ports []int) { //Run Async
 	InstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
 	ds.InstanceQueue.Put(InstanceTimeout, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().UnixNano(), 10)
-	portainer_url := creds.GetBestPortainer()
 	if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
 		creds.RemovePortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
 		creds.PortainerInstanceCounts[portainer_url] += 1
@@ -225,7 +226,7 @@ func getUserStatus(w http.ResponseWriter, r *http.Request) {
 
 	InstanceId := ds.ActiveUserInstance[userid]
 
-	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Name: ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Challenge_Name, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), IP_Address: ds.InstanceMap[InstanceId].Portainer_Url, Ports_Used: ds.InstanceMap[InstanceId].Ports_Used}.ToString())
+	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), IP_Address: ds.InstanceMap[InstanceId].Portainer_Url, Ports_Used: ds.InstanceMap[InstanceId].Ports_Used}.ToString())
 
 	log.Debug("Finish /getUserStatus Request")
 }

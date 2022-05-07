@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -107,4 +109,13 @@ func testSqlConnection() {
 
 func GetSqlDataSource() gorm.Dialector {
 	return postgres.Open("host="+PostgreSQLCreds.Url+" user="+PostgreSQLCreds.Username+" password="+PostgreSQLCreds.Password+" dbname=runner_db")
+}
+
+func ExtractHost(s string) string {
+	u, err := url.Parse(s)
+    if err != nil {
+        panic(err)
+    }
+	host, _, _ := net.SplitHostPort(u.Host)
+	return host
 }

@@ -52,7 +52,6 @@ func GetBestPortainer() string { //TODO: Returns the Url of the least loaded Por
 	} else if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
 		_, val := PortainerQueue.Min()
 		set := val.(map[string]bool)
-		print("LEN", len(set))
 
 		for url := range set { //Get arbitrary url from set
 			return url

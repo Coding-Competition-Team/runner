@@ -36,12 +36,13 @@ type Success struct {
 }
 
 type PortsJson struct {
+	Host       string
 	Ports_Used []int
 }
 
 type UserStatus struct {
 	Running_Instance bool
-	Challenge_Name   string
+	Challenge_Id     string
 	Time_Left        int
 	IP_Address       string
 	Ports_Used       string
