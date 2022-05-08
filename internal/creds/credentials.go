@@ -113,9 +113,9 @@ func GetSqlDataSource() gorm.Dialector {
 
 func ExtractHost(s string) string {
 	u, err := url.Parse(s)
-    if err != nil {
-        panic(err)
-    }
+	if err != nil {
+		panic(err)
+	}
 	host, _, _ := net.SplitHostPort(u.Host)
 	return host
 }

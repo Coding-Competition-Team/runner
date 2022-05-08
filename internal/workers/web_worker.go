@@ -178,14 +178,6 @@ func _removeInstance(InstanceId int) { //Run Async
 	var NewInstanceTimeout int64 = 0 //Force typecast
 
 	entry := ds.InstanceMap[InstanceId]
-
-	portainer_url := entry.Portainer_Url
-	if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
-		creds.RemovePortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
-		creds.PortainerInstanceCounts[portainer_url] -= 1
-		creds.AddPortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
-	}
-
 	entry.Instance_Timeout = NewInstanceTimeout //Make sure that the instance will be killed in the next kill cycle
 	ds.InstanceMap[InstanceId] = entry
 

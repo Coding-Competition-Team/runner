@@ -6,6 +6,7 @@ import (
 	"runner/internal/api_portainer"
 	"runner/internal/api_sql"
 	"runner/internal/ds"
+	"runner/internal/creds"
 	"runner/internal/log"
 )
 
@@ -93,6 +94,13 @@ func ClearInstanceQueue(){
 			api_portainer.DeleteStack(ds.InstanceMap[InstanceId].Portainer_Url, PortainerId)
 		} else {
 			api_portainer.DeleteContainer(ds.InstanceMap[InstanceId].Portainer_Url, PortainerId)
+		}
+
+		portainer_url := ds.InstanceMap[InstanceId].Portainer_Url
+		if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
+			creds.RemovePortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
+			creds.PortainerInstanceCounts[portainer_url] -= 1
+			creds.AddPortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
 		}
 
 		UserId := ds.InstanceMap[InstanceId].Usr_Id
