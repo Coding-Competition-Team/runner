@@ -44,7 +44,7 @@ type UserStatus struct {
 	Running_Instance bool
 	Challenge_Id     string
 	Time_Left        int
-	IP_Address       string
+	Host             string
 	Ports_Used       string
 }
 
