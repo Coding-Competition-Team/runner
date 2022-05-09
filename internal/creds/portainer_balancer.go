@@ -41,6 +41,22 @@ func RemovePortainerQueue(instanceCount int, url string) {
 	_debug("REMOVE")
 }
 
+func IncrementPortainerQueue(url string) {
+	if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
+		RemovePortainerQueue(PortainerInstanceCounts[url], url)
+		PortainerInstanceCounts[url] += 1
+		AddPortainerQueue(PortainerInstanceCounts[url], url)
+	}
+}
+
+func DecrementPortainerQueue(url string) {
+	if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
+		RemovePortainerQueue(PortainerInstanceCounts[url], url)
+		PortainerInstanceCounts[url] -= 1
+		AddPortainerQueue(PortainerInstanceCounts[url], url)
+	}
+}
+
 func _debug(mode string){
 	json, _ := PortainerQueue.ToJSON()
 	log.Debug(mode, "PortainerQueue", string(json))

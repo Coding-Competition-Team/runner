@@ -109,11 +109,7 @@ func _addInstance(userid string, challid string, portainer_url string, Ports []i
 	InstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
 	ds.InstanceQueue.Put(InstanceTimeout, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
 	discriminant := strconv.FormatInt(time.Now().UnixNano(), 10)
-	if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
-		creds.RemovePortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
-		creds.PortainerInstanceCounts[portainer_url] += 1
-		creds.AddPortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
-	}
+	creds.IncrementPortainerQueue(portainer_url)
 
 	instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Portainer_Url: portainer_url, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
 	ds.InstanceMap[InstanceId] = instance

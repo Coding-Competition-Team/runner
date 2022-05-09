@@ -52,6 +52,8 @@ func syncInstances() {
 			ds.UsedPorts[port] = true
 		}
 		ds.InstanceMap[instance.Instance_Id] = instance
+
+		creds.IncrementPortainerQueue(instance.Portainer_Url)
 	}
 }
 

@@ -97,11 +97,7 @@ func ClearInstanceQueue(){
 		}
 
 		portainer_url := ds.InstanceMap[InstanceId].Portainer_Url
-		if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
-			creds.RemovePortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
-			creds.PortainerInstanceCounts[portainer_url] -= 1
-			creds.AddPortainerQueue(creds.PortainerInstanceCounts[portainer_url], portainer_url)
-		}
+		creds.DecrementPortainerQueue(portainer_url)
 
 		UserId := ds.InstanceMap[InstanceId].Usr_Id
 		ds.InstanceQueue.Remove(timestamp)
