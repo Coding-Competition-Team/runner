@@ -31,6 +31,7 @@ func LoadConfig() {
 	PortainerJWTSecondsPerRefresh = result.Portainer_JWT_Seconds_Per_Refresh
 	DefaultSecondsPerInstance = result.Default_Seconds_Per_Instance
 	DefaultNanosecondsPerInstance = DefaultSecondsPerInstance * 1e9
+	MaxSecondsLeftBeforeExtendAllowed = result.Max_Seconds_Left_Before_Extend_Allowed
 	UsedPorts[RunnerPort] = true //Runner
 	for _, port := range result.Reserved_Ports {
 		UsedPorts[port] = true
