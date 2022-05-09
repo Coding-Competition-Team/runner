@@ -1,6 +1,7 @@
 {
 	"Runner_Port": 10000,
 	"Max_Instance_Count": 3,
+	"Portainer_JWT_Seconds_Per_Refresh": 3600,
 	"Default_Seconds_Per_Instance": 300,
 	"Max_Seconds_Left_Before_Extend_Allowed": 60,
 	"Reserved_Ports": [8000, 9443, 5432, 22],

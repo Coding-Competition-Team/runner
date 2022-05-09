@@ -29,5 +29,6 @@ func main() {
 	creds.LoadCredentials()
 	api_sql.SyncWithDB()
 	go workers.NewWorker(10 * time.Second).Run()
+	go workers.JWTRefreshWorker()
 	workers.HandleRequests()
 }

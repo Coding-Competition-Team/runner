@@ -7,6 +7,7 @@ import (
 type ConfigJson struct {
 	Runner_Port                            int
 	Max_Instance_Count                     int
+	Portainer_JWT_Seconds_Per_Refresh      int
 	Default_Seconds_Per_Instance           int64
 	Max_Seconds_Left_Before_Extend_Allowed int64
 	Reserved_Ports                         []int

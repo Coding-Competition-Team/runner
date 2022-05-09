@@ -45,7 +45,7 @@ func LoadCredentials() {
 	for _, credentials := range result.Portainer_Credentials {
 		PortainerUrls = append(PortainerUrls, credentials.Url)
 		PortainerCreds[credentials.Url] = credentials
-		PortainerJWT[credentials.Url] = getPortainerJWT(credentials)
+		PortainerJWT[credentials.Url] = GetPortainerJWT(credentials)
 		AddPortainerQueue(0, credentials.Url)
 	}
 
@@ -54,7 +54,7 @@ func LoadCredentials() {
 	log.Info("Credentials Loaded!")
 }
 
-func getPortainerJWT(credentials ds.ThirdPartyCredentialsJson) string {
+func GetPortainerJWT(credentials ds.ThirdPartyCredentialsJson) string {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //TODO: Remove
 
 	requestBody, err := json.Marshal(map[string]string{

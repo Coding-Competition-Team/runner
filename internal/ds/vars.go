@@ -17,6 +17,7 @@ var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, 
 var UsedPorts map[int]bool = make(map[int]bool)
 
 var MaxInstanceCount int //From Config
+var PortainerJWTSecondsPerRefresh int //From Config
 var NextInstanceId int = 0
 var DefaultSecondsPerInstance int64 //From Config
 var DefaultNanosecondsPerInstance int64 //Indirectly From Config
