@@ -95,6 +95,7 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 	}
 	portainer_url := creds.GetBestPortainer()
 	ports.Host = creds.ExtractHost(portainer_url)
+	ports.Port_Types = ch.Port_Types
 
 	fmt.Fprint(w, ports.ToString())
 
@@ -214,7 +215,7 @@ func getUserStatus(w http.ResponseWriter, r *http.Request) {
 
 	InstanceId := ds.ActiveUserInstance[userid]
 
-	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(ds.InstanceMap[InstanceId].Portainer_Url), Ports_Used: ds.InstanceMap[InstanceId].Ports_Used}.ToString())
+	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(ds.InstanceMap[InstanceId].Portainer_Url), Ports_Used: ds.InstanceMap[InstanceId].Ports_Used, Port_Types: ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Port_Types}.ToString())
 
 	log.Debug("Finish /getUserStatus Request")
 }
@@ -300,6 +301,18 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, ds.Error{Error: "Missing challenge_name"}.ToString(), http.StatusBadRequest)
 		return
 	}
+	port_types, ok := result["port_types"]
+	if !ok {
+		http.Error(w, ds.Error{Error: "Missing port_types"}.ToString(), http.StatusBadRequest)
+		return
+	}
+	deserialized_port_types := api_sql.Deserialize(port_types, ",")
+	for _, port_type := range deserialized_port_types {
+		if port_type != "NC" && port_type != "HTTP" {
+			http.Error(w, ds.Error{Error: "Invalid port_type " + port_type}.ToString(), http.StatusBadRequest)
+			return
+		}
+	}
 	_docker_compose, ok := result["docker_compose"]
 	if !ok {
 		http.Error(w, ds.Error{Error: "Missing docker_compose"}.ToString(), http.StatusBadRequest)
@@ -312,20 +325,30 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if docker_compose {
-		_docker_compose_file, ok := result["docker_compose_file"]
+		__docker_compose_file, ok := result["docker_compose_file"]
 		if !ok {
 			http.Error(w, ds.Error{Error: "Missing docker_compose_file"}.ToString(), http.StatusBadRequest)
 			return
 		}
-		docker_compose_file, err := base64.StdEncoding.DecodeString(_docker_compose_file)
+		_docker_compose_file, err := base64.StdEncoding.DecodeString(__docker_compose_file)
 		if err != nil {
 			http.Error(w, ds.Error{Error: "Invalid base64 encoding for docker_compose_file"}.ToString(), http.StatusBadRequest)
+			return
+		}
+		docker_compose_file := string(_docker_compose_file)
+		port_count := yaml.DockerComposePortCount(docker_compose_file)
+		if port_count == 0 {
+			http.Error(w, ds.Error{Error: "docker_compose_file does not have any ports exposed"}.ToString(), http.StatusBadRequest)
+			return
+		}
+		if len(deserialized_port_types) != port_count {
+			http.Error(w, ds.Error{Error: "Number of ports exposed in docker_compose_file does not match the number of port types specified"}.ToString(), http.StatusBadRequest)
 			return
 		}
 
 		fmt.Fprint(w, ds.Success{Success: true}.ToString())
 
-		go _addChallengeDockerCompose(challenge_name, string(docker_compose_file))
+		go _addChallengeDockerCompose(challenge_name, port_types, docker_compose_file)
 	} else {
 		internal_port, ok := result["internal_port"]
 		if !ok {
@@ -348,27 +371,32 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if len(deserialized_port_types) != 1 {
+			http.Error(w, ds.Error{Error: "Number of port types specified is not 1"}.ToString(), http.StatusBadRequest)
+			return
+		}
+
 		fmt.Fprint(w, ds.Success{Success: true}.ToString())
 
-		go _addChallengeNonDockerCompose(challenge_name, internal_port, image_name, string(docker_cmds))
+		go _addChallengeNonDockerCompose(challenge_name, port_types, internal_port, image_name, string(docker_cmds))
 	}
 }
 
-func _addChallengeDockerCompose(challenge_name string, docker_compose_file string) { //Run Async
+func _addChallengeDockerCompose(challenge_name string, port_types string, docker_compose_file string) { //Run Async
 	log.Debug("Start /addChallenge Request (Docker Compose)")
 	port_count := yaml.DockerComposePortCount(docker_compose_file)
 	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, true, port_count)
-	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Docker_Compose: true, Port_Count: port_count, Docker_Compose_File: docker_compose_file}
+	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Port_Types: port_types, Docker_Compose: true, Port_Count: port_count, Docker_Compose_File: docker_compose_file}
 	api_sql.UpdateChallenge(ch)
 
 	ds.ChallengeMap[challenge_id] = ch
 	log.Debug("Finish /addChallenge Request (Docker Compose)")
 }
 
-func _addChallengeNonDockerCompose(challenge_name string, internal_port string, image_name string, docker_cmds string) { //Run Async
+func _addChallengeNonDockerCompose(challenge_name string, port_types string, internal_port string, image_name string, docker_cmds string) { //Run Async
 	log.Debug("Start /addChallenge Request (Non Docker Compose)")
 	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, false, 1)
-	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Docker_Compose: false, Port_Count: 1, Internal_Port: internal_port, Image_Name: image_name, Docker_Cmds: docker_cmds}
+	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Port_Types: port_types, Docker_Compose: false, Port_Count: 1, Internal_Port: internal_port, Image_Name: image_name, Docker_Cmds: docker_cmds}
 	api_sql.UpdateChallenge(ch)
 
 	ds.ChallengeMap[challenge_id] = ch

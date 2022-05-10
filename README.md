@@ -60,6 +60,7 @@ That's it really.
       ```
       {
               'challenge_name': , 
+              'port_types': ,
               'docker_compose': ,
               'internal_port': ,
               'image_name': ,
@@ -69,11 +70,12 @@ That's it really.
       ```
       * Fields common to both Portainer Image **and** Stack:
         * `challenge_name` (Mandatory): Any valid challenge name in **lowercase**
+        * `port_types` (Mandatory): Either `'NC'` or `'HTTP'` per port used that is **comma-separated**, in the same order as provided in `docker_compose_file` (for Portainer Stacks)
         * `docker_compose` (Mandatory): Either `'True'` or `'False'`
       * Fields for Portainer Image **only** (i.e. when `docker_compose` is `'False'`):
         * `internal_port` (Mandatory): Dockerfile exposed port
         * `image_name` (Mandatory): Image name of built Docker image
-        * `docker_cmds` (Optional): Commands to be passed to the Docker container on start that is **base64-encoded**
+        * `docker_cmds` (Optional): Commands to be passed to the Docker container on start that is **separated by \n** and **base64-encoded**
       * Fields for Portainer Stack **only** (i.e. when `docker_compose` is `'True'`):
         * `docker_compose_file` (Mandatory): Docker Compose file that is **compatible with Portainer Stacks** and **base64-encoded**
     * Errors:

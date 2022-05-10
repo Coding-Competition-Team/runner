@@ -39,6 +39,7 @@ type Success struct {
 type PortsJson struct {
 	Host       string
 	Ports_Used []int
+	Port_Types string
 }
 
 type UserStatus struct {
@@ -47,6 +48,7 @@ type UserStatus struct {
 	Time_Left        int
 	Host             string
 	Ports_Used       string
+	Port_Types       string
 }
 
 type Instance struct {
@@ -62,6 +64,7 @@ type Instance struct {
 type Challenge struct {
 	Challenge_Id   string //Defaults to "" (Unknown ChallengeId)
 	Challenge_Name string
+	Port_Types     string
 	Docker_Compose bool
 	Port_Count     int
 
