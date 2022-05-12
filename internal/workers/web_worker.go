@@ -95,7 +95,7 @@ func addInstance(w http.ResponseWriter, r *http.Request) {
 	}
 	portainer_url := creds.GetBestPortainer()
 	ports.Host = creds.ExtractHost(portainer_url)
-	ports.Port_Types = ch.Port_Types
+	ports.Port_Types = api_sql.Deserialize(ch.Port_Types, ",")
 
 	fmt.Fprint(w, ports.ToString())
 
@@ -215,7 +215,7 @@ func getUserStatus(w http.ResponseWriter, r *http.Request) {
 
 	InstanceId := ds.ActiveUserInstance[userid]
 
-	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(ds.InstanceMap[InstanceId].Portainer_Url), Ports_Used: ds.InstanceMap[InstanceId].Ports_Used, Port_Types: ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Port_Types}.ToString())
+	fmt.Fprint(w, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(ds.InstanceMap[InstanceId].Portainer_Url), Ports_Used: api_sql.DeserializeI(ds.InstanceMap[InstanceId].Ports_Used), Port_Types: api_sql.Deserialize(ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Port_Types, ",")}.ToString())
 
 	log.Debug("Finish /getUserStatus Request")
 }
@@ -308,7 +308,7 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 	deserialized_port_types := api_sql.Deserialize(port_types, ",")
 	for _, port_type := range deserialized_port_types {
-		if port_type != "NC" && port_type != "HTTP" {
+		if port_type != "nc" && port_type != "http" {
 			http.Error(w, ds.Error{Error: "Invalid port_type " + port_type}.ToString(), http.StatusBadRequest)
 			return
 		}

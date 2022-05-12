@@ -39,7 +39,7 @@ type Success struct {
 type PortsJson struct {
 	Host       string
 	Ports_Used []int
-	Port_Types string
+	Port_Types []string
 }
 
 type UserStatus struct {
@@ -47,8 +47,8 @@ type UserStatus struct {
 	Challenge_Id     string
 	Time_Left        int
 	Host             string
-	Ports_Used       string
-	Port_Types       string
+	Ports_Used       []int
+	Port_Types       []string
 }
 
 type Instance struct {

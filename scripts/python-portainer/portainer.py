@@ -56,9 +56,12 @@ def docker_compose(challenge, chall_data, dir, env):
     else:
         logging.info(f'{challenge} built successfully')
 
-    # Create new docker-compose
+    # Create new docker-compose, count number of ports
+    port_count = 0
     new_compose = chall_data
     for service, data in chall_data['services'].items():
+        if "ports" in chall_data["services"][service]:
+            port_count += len(chall_data["services"][service]["ports"])
         new_compose['services'][service].pop('build', 0)
         new_compose['services'][service]['image'] = f'{challenge.lower()}_{service.lower()}'
     new_compose = bytes(yaml.dump(new_compose), 'utf-8')
@@ -69,6 +72,7 @@ def docker_compose(challenge, chall_data, dir, env):
     }
     payload = {
             'challenge_name': challenge.lower(),
+            'port_types': ",".join(["nc"] * port_count), #TODO: Handle other permutations
             'docker_compose': 'True',
             'docker_compose_file': bytes.decode(base64.b64encode(new_compose)),
     }
@@ -111,6 +115,7 @@ def dockerfile(challenge, chall_data, dir, env):
     }
     payload = {
             'challenge_name': challenge.lower(),
+            'port_types': "nc", #TODO: Handle "http"
             'docker_compose': 'False',
             'internal_port': port,
             'image_name': challenge.lower(),
