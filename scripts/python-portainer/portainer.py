@@ -126,6 +126,14 @@ def dockerfile(challenge, chall_data, dir, env):
 
 # --- main ---
 def main():
+    # Install haveged to speed up Portainer by increasing system entropy
+    haveged = subprocess.run(['apt', 'install', 'haveged'], cwd=dir, stdout=subprocess.PIPE, env=env)
+    try:
+        for stdout_line in iter(haveged.stdout.readline, ""):
+            print('| ' + stdout_line)
+    except AttributeError:
+        pass
+
     # TODO: 1 thread per challenge to speed up building
     # Scan for challenges
     with os.scandir() as scan:
