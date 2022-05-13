@@ -4,7 +4,7 @@ Runner is meant to simplify deployment of isolated challenges during a CTF. Runn
 Features:
 - Deploy isolated challenges
 - Time limit for deployed challenges
-- Supports multiple Portainer servers (in future)
+- Supports multiple Portainer servers
 
 ## Config and Credentials
 More details are provided in /config
