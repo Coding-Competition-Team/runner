@@ -131,8 +131,10 @@ def dockerfile(challenge, chall_data, dir, env):
 
 # --- main ---
 def main():
+    env = os.environ.copy()
+
     # Install haveged to speed up Portainer by increasing system entropy
-    haveged = subprocess.run(['apt', 'install', 'haveged'], cwd=dir, stdout=subprocess.PIPE, env=env)
+    haveged = subprocess.run(['apt', 'install', 'haveged'], stdout=subprocess.PIPE, env=env)
     try:
         for stdout_line in iter(haveged.stdout.readline, ""):
             print('| ' + stdout_line)
@@ -145,8 +147,6 @@ def main():
         for i in scan:
             if i.is_dir():
                 challenges.append(i.name)
-
-    env = os.environ.copy()
 
     # Save challenge data and build image
     for challenge in challenges:
