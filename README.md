@@ -11,7 +11,7 @@ More details are provided in /config
 
 ## Quickstart
 1. Configure `/config/config.json` and `/config/credentials.json`
-2. `docker-compose up -d`
+2. Run the binary with `/config` as an argument. I.e `./runner.o /config`
 
 That's it really.
 
