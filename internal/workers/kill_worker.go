@@ -68,7 +68,7 @@ func (w *Worker) Shutdown() {
 // Action defines what the worker does; override this.
 // For now we'll just wait two seconds and print to simulate work.
 func (w *Worker) Action() {
-	ClearInstanceQueue() //TODO: Handle timeout/race condition
+	ClearInstanceQueue() //TODO: Make this async?
 }
 
 // Clears the current InstanceQueue for all instances with timestamp <= current_timestamp

@@ -62,7 +62,7 @@ func _debug(mode string){
 	log.Debug(mode, "PortainerQueue", string(json))
 }
 
-func GetBestPortainer() string { //TODO: Returns the Url of the least loaded Portainer
+func GetBestPortainer() string {
 	if ds.PortainerBalanceStrategy == "RANDOM" {
 		return PortainerUrls[rand.Intn(len(PortainerUrls))]
 	} else if ds.PortainerBalanceStrategy == "DISTRIBUTE" {
@@ -73,5 +73,5 @@ func GetBestPortainer() string { //TODO: Returns the Url of the least loaded Por
 			return url
 		}
 	}
-	panic("Unexpected behavior") //TODO
+	panic("Unknown Portainer Balance Strategy " + ds.PortainerBalanceStrategy)
 }
