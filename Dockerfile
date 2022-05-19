@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine
+FROM golang:1.17
 WORKDIR /app
 ENV TZ=Asia/Singapore
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
