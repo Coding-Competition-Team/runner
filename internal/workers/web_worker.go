@@ -308,7 +308,7 @@ func addChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 	deserialized_port_types := api_sql.Deserialize(port_types, ",")
 	for _, port_type := range deserialized_port_types {
-		if port_type != "nc" && port_type != "http" {
+		if port_type != "nc" && port_type != "ssh" && port_type != "http" {
 			http.Error(w, ds.Error{Error: "Invalid port_type " + port_type}.ToString(), http.StatusBadRequest)
 			return
 		}

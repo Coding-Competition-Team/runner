@@ -70,7 +70,7 @@ That's it really.
       ```
       * Fields common to both Portainer Image **and** Stack:
         * `challenge_name` (Mandatory): Any valid challenge name in **lowercase**
-        * `port_types` (Mandatory): Either `'nc'` or `'http'` per port used that is **comma-separated**, in the same order as provided in `docker_compose_file` (for Portainer Stacks)
+        * `port_types` (Mandatory): Either `'nc'`, `'ssh'`, or `'http'` per port used that is **comma-separated**, in the same order as provided in `docker_compose_file` (for Portainer Stacks)
         * `docker_compose` (Mandatory): Either `'True'` or `'False'`
       * Fields for Portainer Image **only** (i.e. when `docker_compose` is `'False'`):
         * `internal_port` (Mandatory): Dockerfile exposed port
