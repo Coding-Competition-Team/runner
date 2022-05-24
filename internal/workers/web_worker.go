@@ -21,6 +21,7 @@ import (
 func HandleRequests() {
 	http.HandleFunc("/addInstance", addInstance)
 	http.HandleFunc("/removeInstance", removeInstance)
+	http.HandleFunc("/removeInstance/admin", removeInstanceAdmin)
 	http.HandleFunc("/getUserStatus", getUserStatus)
 	http.HandleFunc("/extendTimeLeft", extendTimeLeft)
 	http.HandleFunc("/addChallenge", addChallenge)
@@ -187,6 +188,50 @@ func _removeInstance(InstanceId int) { //Run Async
 
 	//No need to update DB since it will be removed anyways...
 	log.Debug("Finish /removeInstance Request")
+}
+
+func removeInstanceAdmin(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received /removeInstance/admin Request")
+
+	params := r.URL.Query()
+
+	_userid := params["userid"]
+	if len(_userid) == 0 {
+		http.Error(w, ds.Error{Error: "Missing userid"}.ToString(), http.StatusForbidden)
+		return
+	}
+	userid := _userid[0]
+
+	if !validateUserid(userid) {
+		http.Error(w, ds.Error{Error: "Invalid userid"}.ToString(), http.StatusForbidden)
+		return
+	}
+
+	if !activeUserInstance(userid) {
+		http.Error(w, ds.Error{Error: "User does not have an instance"}.ToString(), http.StatusForbidden)
+		return
+	}
+
+	InstanceId := ds.ActiveUserInstance[userid]
+
+	fmt.Fprint(w, ds.Success{Success: true}.ToString())
+
+	go _removeInstanceAdmin(InstanceId)
+}
+
+func _removeInstanceAdmin(InstanceId int) { //Run Async
+	log.Debug("Start /removeInstance/admin Request")
+
+	UserId := ds.InstanceMap[InstanceId].Usr_Id
+
+	//Essentially makes the Runner forget that the user is running an instance (bypassing the "User does not have an instance" error)
+	//Note that in reality, the instance spinned up by the user is still running or being created (and will only be automatically deleted when the instance expires)
+	entry := ds.InstanceMap[InstanceId]
+	entry.Usr_Id = "" //Make sure the instance is no longer tied to any user id
+	ds.InstanceMap[InstanceId] = entry
+	delete(ds.ActiveUserInstance, UserId)
+
+	log.Debug("Finish /removeInstance/admin Request")
 }
 
 func getUserStatus(w http.ResponseWriter, r *http.Request) {

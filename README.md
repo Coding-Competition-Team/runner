@@ -37,6 +37,14 @@ That's it really.
       * User does not have an instance running
       * User's Instance is still starting
 
+  * `removeInstance/admin`
+    * Forcibly removes an Instance for a specific user.
+    * `/removeInstance/admin?userid=XXXX`
+    * `userid` must be a valid userid
+    * Errors:
+      * Missing/Invalid `userID`
+      * User does not have an instance running
+
   * `getUserStatus`
     * Gets the time left, challenge info, etc. for a specific user's instance (if available).
     * `/getUserStatus?userid=XXXX`
