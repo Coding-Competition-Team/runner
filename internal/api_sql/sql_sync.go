@@ -1,6 +1,8 @@
 package api_sql
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 
 	"runner/internal/creds"
@@ -8,14 +10,11 @@ import (
 	"runner/internal/log"
 )
 
-func syncChallenges() {
-	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
-	if err != nil {
-		panic(err)
-	}
+var DB *gorm.DB
 
+func syncChallenges() {
 	challenges := []ds.Challenge{}
-	db.Find(&challenges)
+	DB.Find(&challenges)
 
 	for _, ch := range challenges {
 		ds.ChallengeMap[ch.Challenge_Id] = ch
@@ -28,13 +27,8 @@ func validatePortainerUrl(url string) bool {
 }
 
 func syncInstances() {
-	db, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
-	if err != nil {
-		panic(err)
-	}
-
 	instances := []ds.Instance{}
-	db.Find(&instances) //Fully trust DB
+	DB.Find(&instances) //Fully trust DB
 
 	for _, instance := range instances {
 		if !validatePortainerUrl(instance.Portainer_Url) {
@@ -59,9 +53,24 @@ func syncInstances() {
 
 func SyncWithDB() {
 	log.Info("Starting DB Sync...")
+
+	DB, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+
+	sqlDB, err := DB.DB()
+	if err != nil {
+		panic(err)
+	}
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+
 	syncChallenges()
 	log.Debug("Challenge Map:", ds.ChallengeMap)
 	syncInstances()
 	log.Debug("Instance Map:", ds.InstanceMap)
+
 	log.Info("DB Sync Complete!")
 }
