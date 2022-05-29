@@ -54,7 +54,8 @@ func syncInstances() {
 func SyncWithDB() {
 	log.Info("Starting DB Sync...")
 
-	DB, err := gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
+	var err error
+	DB, err = gorm.Open(creds.GetSqlDataSource(), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
