@@ -28,14 +28,6 @@ type CredentialsJson struct {
 	Api_Authorization      string
 }
 
-type Error struct {
-	Error string
-}
-
-type Success struct {
-	Success bool
-}
-
 type PortsJson struct {
 	Host       string
 	Ports_Used []int
@@ -49,6 +41,13 @@ type UserStatus struct {
 	Host             string
 	Ports_Used       []int
 	Port_Types       []string
+}
+
+type RunnerStatus struct {
+	Current_Instance_Count int
+	Max_Instance_Count     int
+	Instances              []Instance
+	Challenges             []Challenge
 }
 
 type Instance struct {
@@ -77,50 +76,10 @@ type Challenge struct {
 	Docker_Compose_File string
 }
 
-func (error Error) ToString() string {
-	errorJson, err := json.Marshal(error) //No need to pretty print
-    if err != nil {
-        panic(err)
-    }
-	return string(errorJson)
-}
-
-func (success Success) ToString() string {
-	successJson, err := json.Marshal(success) //No need to pretty print
-    if err != nil {
-        panic(err)
-    }
-	return string(successJson)
-}
-
-func (portsJson PortsJson) ToString() string {
-	statusJson, err := json.Marshal(portsJson) //No need to pretty print
-    if err != nil {
-        panic(err)
-    }
-	return string(statusJson)
-}
-
-func (status UserStatus) ToString() string {
-	statusJson, err := json.Marshal(status) //No need to pretty print
-    if err != nil {
-        panic(err)
-    }
-	return string(statusJson)
-}
-
 func (instance Instance) ToString() string {
 	instanceJson, err := json.MarshalIndent(instance, "", "  ") //Pretty print
     if err != nil {
         panic(err)
     }
 	return string(instanceJson)
-}
-
-func (challenge Challenge) ToString() string {
-	challengeJson, err := json.MarshalIndent(challenge, "", "  ") //Pretty print
-    if err != nil {
-        panic(err)
-    }
-	return string(challengeJson)
 }
