@@ -12,15 +12,6 @@ import (
 
 var DB *gorm.DB
 
-func syncChallenges() {
-	challenges := []ds.Challenge{}
-	DB.Find(&challenges)
-
-	for _, ch := range challenges {
-		ds.ChallengeMap[ch.Challenge_Id] = ch
-	}
-}
-
 func validatePortainerUrl(url string) bool {
 	_, ok := creds.PortainerCreds[url]
 	return ok
@@ -68,8 +59,6 @@ func SyncWithDB() {
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	syncChallenges()
-	log.Debug("Challenge Map:", ds.ChallengeMap)
 	syncInstances()
 	log.Debug("Instance Map:", ds.InstanceMap)
 

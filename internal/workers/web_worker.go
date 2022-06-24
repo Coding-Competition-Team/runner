@@ -38,8 +38,8 @@ func validateUserid(userid string) bool {
 }
 
 func validateChallid(challid string) bool {
-	_, ok := ds.ChallengeMap[challid]
-	if ok { //If challid exists in ChallengeMap, check if it is not unsafe to launch
+	valid := api_sql.ValidChallenge(challid)
+	if valid { //If challid exists in ChallengeMap, check if it is not unsafe to launch
 		return !ds.ChallengeUnsafeToLaunch[challid]
 	}
 	return false //challid does not exist in ChallengeMap
@@ -83,7 +83,7 @@ func addInstance(c *gin.Context) {
 		return
 	}
 
-	ch := ds.ChallengeMap[challid]
+	ch := api_sql.GetChallenge(challid)
 
 	var ports ds.PortsJson
 	ports.Ports_Used = make([]int, ch.Port_Count) //Cannot directly use [ch.PortCount]int
@@ -116,7 +116,7 @@ func _addInstance(userid string, challid string, portainer_url string, Ports []i
 
 	var PortainerId string
 
-	ch := ds.ChallengeMap[challid]
+	ch := api_sql.GetChallenge(challid)
 	if ch.Docker_Compose {
 		new_docker_compose := yaml.DockerComposeCopy(ch.Docker_Compose_File, Ports)
 		PortainerId = api_portainer.LaunchStack(portainer_url, ch.Challenge_Name, new_docker_compose, discriminant)
@@ -244,7 +244,7 @@ func getUserStatus(c *gin.Context) {
 
 	InstanceId := ds.ActiveUserInstance[userid]
 
-	c.JSON(http.StatusOK, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(ds.InstanceMap[InstanceId].Portainer_Url), Ports_Used: api_sql.DeserializeI(ds.InstanceMap[InstanceId].Ports_Used), Port_Types: api_sql.Deserialize(ds.ChallengeMap[ds.InstanceMap[InstanceId].Challenge_Id].Port_Types, ",")})
+	c.JSON(http.StatusOK, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(ds.InstanceMap[InstanceId].Portainer_Url), Ports_Used: api_sql.DeserializeI(ds.InstanceMap[InstanceId].Ports_Used), Port_Types: api_sql.Deserialize(api_sql.GetChallenge(ds.InstanceMap[InstanceId].Challenge_Id).Port_Types, ",")})
 
 	log.Debug("Finish /getUserStatus Request")
 }
@@ -395,7 +395,6 @@ func _addChallengeDockerCompose(challenge_name string, port_types string, docker
 	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Port_Types: port_types, Docker_Compose: true, Port_Count: port_count, Docker_Compose_File: docker_compose_file}
 	api_sql.UpdateChallenge(ch)
 
-	ds.ChallengeMap[challenge_id] = ch
 	log.Debug("Finish /addChallenge Request (Docker Compose)")
 }
 
@@ -405,7 +404,6 @@ func _addChallengeNonDockerCompose(challenge_name string, port_types string, int
 	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Port_Types: port_types, Docker_Compose: false, Port_Count: 1, Internal_Port: internal_port, Image_Name: image_name, Docker_Cmds: docker_cmds}
 	api_sql.UpdateChallenge(ch)
 
-	ds.ChallengeMap[challenge_id] = ch
 	log.Debug("Finish /addChallenge Request (Non Docker Compose)")
 }
 
@@ -451,7 +449,6 @@ func _removeChallenge(challid string) { //Run Async
 
 	api_sql.DeleteChallenge(challid)
 
-	delete(ds.ChallengeMap, challid)
 	delete(ds.ChallengeUnsafeToLaunch, challid)
 
 	log.Debug("Finish /removeChallenge Request")
@@ -476,12 +473,7 @@ func getStatus(c *gin.Context) {
 		instances = append(instances, instance)
 	}
 
-	challenges := make([]ds.Challenge, 0, len(ds.ChallengeMap))
-	for _, challenge := range ds.ChallengeMap {
-		challenges = append(challenges, challenge)
-	}
-
-	c.JSON(http.StatusOK, ds.RunnerStatus{Current_Instance_Count: len(ds.InstanceMap), Max_Instance_Count: ds.MaxInstanceCount, Instances: instances, Challenges: challenges})
+	c.JSON(http.StatusOK, ds.RunnerStatus{Current_Instance_Count: len(ds.InstanceMap), Max_Instance_Count: ds.MaxInstanceCount, Instances: instances, Challenges: api_sql.GetChallenges()})
 
 	log.Debug("Finish /getStatus Request")
 }
