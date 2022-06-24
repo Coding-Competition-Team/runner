@@ -22,6 +22,12 @@ func GetInstanceCount() int64 {
 	return count
 }
 
+func GetActiveUserInstance(userid string) ds.Instance {
+	var instance ds.Instance
+	DB.Where("usr_id = ?", userid).First(&instance)
+	return instance
+}
+
 //instance needs Instance_Id, Usr_Id, Challenge_Id, Instance_Timeout, Ports_Used
 func AddInstance(Instance ds.Instance) {
 	DB.Create(&Instance)

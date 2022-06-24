@@ -102,6 +102,5 @@ func ClearInstanceQueue(){
 		for _, v := range api_sql.DeserializeI(instance.Ports_Used) {
 			delete(ds.UsedPorts, v)
 		}
-		delete(ds.ActiveUserInstance, instance.Usr_Id)
 	}
 }

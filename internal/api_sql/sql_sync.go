@@ -29,7 +29,6 @@ func syncInstances() {
 		if (instance.Instance_Id + 1) > ds.NextInstanceId {
 			ds.NextInstanceId = instance.Instance_Id + 1
 		}
-		ds.ActiveUserInstance[instance.Usr_Id] = instance.Instance_Id
 		ds.InstanceQueue.Put(instance.Instance_Timeout, instance.Instance_Id)
 
 		deserialized_ports := DeserializeI(instance.Ports_Used)
