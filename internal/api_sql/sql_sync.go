@@ -36,7 +36,6 @@ func syncInstances() {
 		for _, port := range deserialized_ports {
 			ds.UsedPorts[port] = true
 		}
-		ds.InstanceMap[instance.Instance_Id] = instance
 
 		creds.IncrementPortainerQueue(instance.Portainer_Url)
 	}
@@ -60,7 +59,6 @@ func SyncWithDB() {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	syncInstances()
-	log.Debug("Instance Map:", ds.InstanceMap)
 
 	log.Info("DB Sync Complete!")
 }

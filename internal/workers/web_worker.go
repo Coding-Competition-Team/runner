@@ -78,7 +78,7 @@ func addInstance(c *gin.Context) {
 		return
 	}
 
-	if len(ds.InstanceMap) >= ds.MaxInstanceCount { //Use >= instead of == just in case
+	if api_sql.GetInstanceCount() >= ds.MaxInstanceCount { //Use >= instead of == just in case
 		c.JSON(http.StatusBadRequest, gin.H{"Error": "The max number of instances for the platform has already been reached, try again later"})
 		return
 	}
@@ -110,8 +110,6 @@ func _addInstance(userid string, challid string, portainer_url string, Ports []i
 	creds.IncrementPortainerQueue(portainer_url)
 
 	instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Portainer_Url: portainer_url, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
-	ds.InstanceMap[InstanceId] = instance
-
 	api_sql.AddInstance(instance)
 
 	var PortainerId string
@@ -126,11 +124,9 @@ func _addInstance(userid string, challid string, portainer_url string, Ports []i
 
 	log.Debug("Portainer ID:", PortainerId)
 
-	entry := ds.InstanceMap[InstanceId]
-	entry.Portainer_Id = PortainerId
-	ds.InstanceMap[InstanceId] = entry //Update PortainerId once it's available
+	instance.Portainer_Id = PortainerId
+	api_sql.SetInstancePortainerId(InstanceId, PortainerId) //Update PortainerId once it's available
 
-	api_sql.SetInstancePortainerId(InstanceId, PortainerId)
 	log.Debug("Finish /addInstance Request")
 }
 
@@ -153,7 +149,8 @@ func removeInstance(c *gin.Context) {
 	}
 
 	InstanceId := ds.ActiveUserInstance[userid]
-	if ds.InstanceMap[InstanceId].Portainer_Id == "" {
+	instance := api_sql.GetInstance(InstanceId)
+	if instance.Portainer_Id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": "The instance is still starting"})
 		return
 	}
@@ -167,9 +164,9 @@ func _removeInstance(InstanceId int) { //Run Async
 	log.Debug("Start /removeInstance Request")
 	var NewInstanceTimeout int64 = 0 //Force typecast
 
-	entry := ds.InstanceMap[InstanceId]
-	entry.Instance_Timeout = NewInstanceTimeout //Make sure that the instance will be killed in the next kill cycle
-	ds.InstanceMap[InstanceId] = entry
+	instance := api_sql.GetInstance(InstanceId)
+	instance.Instance_Timeout = NewInstanceTimeout //Make sure that the instance will be killed in the next kill cycle
+	api_sql.UpdateInstance(instance)
 
 	a, b := ds.InstanceQueue.GetKey(InstanceId)
 	if !b {
@@ -178,7 +175,6 @@ func _removeInstance(InstanceId int) { //Run Async
 	ds.InstanceQueue.Remove(a)
 	ds.InstanceQueue.Put(NewInstanceTimeout, InstanceId) //Replace
 
-	//No need to update DB since it will be removed anyways...
 	log.Debug("Finish /removeInstance Request")
 }
 
@@ -210,13 +206,13 @@ func removeInstanceAdmin(c *gin.Context) {
 func _removeInstanceAdmin(InstanceId int) { //Run Async
 	log.Debug("Start /removeInstance/admin Request")
 
-	UserId := ds.InstanceMap[InstanceId].Usr_Id
+	instance := api_sql.GetInstance(InstanceId)
+	UserId := instance.Usr_Id
 
 	//Essentially makes the Runner forget that the user is running an instance (bypassing the "User does not have an instance" error)
 	//Note that in reality, the instance spinned up by the user is still running or being created (and will only be automatically deleted when the instance expires)
-	entry := ds.InstanceMap[InstanceId]
-	entry.Usr_Id = "" //Make sure the instance is no longer tied to any user id
-	ds.InstanceMap[InstanceId] = entry
+	instance.Usr_Id = "" //Make sure the instance is no longer tied to any user id
+	api_sql.UpdateInstance(instance)
 	delete(ds.ActiveUserInstance, UserId)
 
 	log.Debug("Finish /removeInstance/admin Request")
@@ -243,8 +239,9 @@ func getUserStatus(c *gin.Context) {
 	log.Debug("Start /getUserStatus Request")
 
 	InstanceId := ds.ActiveUserInstance[userid]
+	instance := api_sql.GetInstance(InstanceId)
 
-	c.JSON(http.StatusOK, ds.UserStatus{Running_Instance: true, Challenge_Id: ds.InstanceMap[InstanceId].Challenge_Id, Time_Left: int((ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(ds.InstanceMap[InstanceId].Portainer_Url), Ports_Used: api_sql.DeserializeI(ds.InstanceMap[InstanceId].Ports_Used), Port_Types: api_sql.Deserialize(api_sql.GetChallenge(ds.InstanceMap[InstanceId].Challenge_Id).Port_Types, ",")})
+	c.JSON(http.StatusOK, ds.UserStatus{Running_Instance: true, Challenge_Id: instance.Challenge_Id, Time_Left: int((instance.Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(instance.Portainer_Url), Ports_Used: api_sql.DeserializeI(instance.Ports_Used), Port_Types: api_sql.Deserialize(api_sql.GetChallenge(instance.Challenge_Id).Port_Types, ",")})
 
 	log.Debug("Finish /getUserStatus Request")
 }
@@ -268,8 +265,9 @@ func extendTimeLeft(c *gin.Context) {
 	}
 
 	InstanceId := ds.ActiveUserInstance[userid]
+	instance := api_sql.GetInstance(InstanceId)
 
-	if (ds.InstanceMap[InstanceId].Instance_Timeout-time.Now().UnixNano())/1e9 > ds.MaxSecondsLeftBeforeExtendAllowed {
+	if (instance.Instance_Timeout-time.Now().UnixNano())/1e9 > ds.MaxSecondsLeftBeforeExtendAllowed {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": "User needs to wait until instance expires in " + strconv.FormatInt(ds.MaxSecondsLeftBeforeExtendAllowed, 10) + " seconds"})
 		return
 	}
@@ -282,11 +280,7 @@ func extendTimeLeft(c *gin.Context) {
 func _extendTimeLeft(userid string) { //Run Async
 	log.Debug("Start /extendTimeLeft Request")
 	InstanceId := ds.ActiveUserInstance[userid]
-	entry := ds.InstanceMap[InstanceId]
-
 	NewInstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
-	entry.Instance_Timeout = NewInstanceTimeout
-	ds.InstanceMap[InstanceId] = entry
 
 	a, b := ds.InstanceQueue.GetKey(InstanceId)
 	if !b {
@@ -439,7 +433,7 @@ func _removeChallenge(challid string) { //Run Async
 
 	ds.ChallengeUnsafeToLaunch[challid] = true; //Mark challenge as unsafe to launch
 
-	for _, instance := range ds.InstanceMap {
+	for _, instance := range api_sql.GetInstances() {
 		if instance.Challenge_Id == challid {
 			go _removeInstance(instance.Instance_Id) //Make sure that all instances running this challenge are killed
 		}
@@ -468,12 +462,7 @@ func getStatus(c *gin.Context) {
 
 	log.Debug("Start /getStatus Request")
 
-	instances := make([]ds.Instance, 0, len(ds.InstanceMap))
-	for _, instance := range ds.InstanceMap {
-		instances = append(instances, instance)
-	}
-
-	c.JSON(http.StatusOK, ds.RunnerStatus{Current_Instance_Count: len(ds.InstanceMap), Max_Instance_Count: ds.MaxInstanceCount, Instances: instances, Challenges: api_sql.GetChallenges()})
+	c.JSON(http.StatusOK, ds.RunnerStatus{Current_Instance_Count: api_sql.GetInstanceCount(), Max_Instance_Count: ds.MaxInstanceCount, Instances: api_sql.GetInstances(), Challenges: api_sql.GetChallenges()})
 
 	log.Debug("Finish /getStatus Request")
 }

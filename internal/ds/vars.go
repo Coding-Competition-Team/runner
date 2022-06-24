@@ -12,11 +12,10 @@ import (
 var RunnerPort int //From Config
 
 var ActiveUserInstance map[string]int = make(map[string]int)                                         //UserId -> InstanceId
-var InstanceMap map[int]Instance = make(map[int]Instance)                                            //InstanceId -> Instance
 var InstanceQueue *treebidimap.Map = treebidimap.NewWith(utils.Int64Comparator, utils.IntComparator) //Unix (Nano) Timestamp of Instance Timeout -> InstanceId
 var UsedPorts map[int]bool = make(map[int]bool)
 
-var MaxInstanceCount int //From Config
+var MaxInstanceCount int64 //From Config
 var PortainerJWTSecondsPerRefresh int //From Config
 var NextInstanceId int = 0
 var DefaultSecondsPerInstance int64 //From Config

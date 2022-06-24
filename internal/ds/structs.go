@@ -6,7 +6,7 @@ import (
 
 type ConfigJson struct {
 	Runner_Port                            int
-	Max_Instance_Count                     int
+	Max_Instance_Count                     int64
 	Portainer_JWT_Seconds_Per_Refresh      int
 	Default_Seconds_Per_Instance           int64
 	Max_Seconds_Left_Before_Extend_Allowed int64
@@ -44,8 +44,8 @@ type UserStatus struct {
 }
 
 type RunnerStatus struct {
-	Current_Instance_Count int
-	Max_Instance_Count     int
+	Current_Instance_Count int64
+	Max_Instance_Count     int64
 	Instances              []Instance
 	Challenges             []Challenge
 }

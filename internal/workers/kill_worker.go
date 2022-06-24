@@ -87,24 +87,21 @@ func ClearInstanceQueue(){
 		
 		log.Info("Clearing Instance", InstanceId)
 
+		instance := api_sql.GetInstance(InstanceId) //Save a copy of the instance before it gets deleted
 		api_sql.DeleteInstance(InstanceId)
 
-		PortainerId := ds.InstanceMap[InstanceId].Portainer_Id
-		if api_sql.GetChallenge(ds.InstanceMap[InstanceId].Challenge_Id).Docker_Compose {
-			api_portainer.DeleteStack(ds.InstanceMap[InstanceId].Portainer_Url, PortainerId)
+		if api_sql.GetChallenge(instance.Challenge_Id).Docker_Compose {
+			api_portainer.DeleteStack(instance.Portainer_Url, instance.Portainer_Id)
 		} else {
-			api_portainer.DeleteContainer(ds.InstanceMap[InstanceId].Portainer_Url, PortainerId)
+			api_portainer.DeleteContainer(instance.Portainer_Url, instance.Portainer_Id)
 		}
 
-		portainer_url := ds.InstanceMap[InstanceId].Portainer_Url
-		creds.DecrementPortainerQueue(portainer_url)
+		creds.DecrementPortainerQueue(instance.Portainer_Url)
 
-		UserId := ds.InstanceMap[InstanceId].Usr_Id
 		ds.InstanceQueue.Remove(timestamp)
-		for _, v := range api_sql.DeserializeI(ds.InstanceMap[InstanceId].Ports_Used) {
+		for _, v := range api_sql.DeserializeI(instance.Ports_Used) {
 			delete(ds.UsedPorts, v)
 		}
-		delete(ds.InstanceMap, InstanceId)
-		delete(ds.ActiveUserInstance, UserId)
+		delete(ds.ActiveUserInstance, instance.Usr_Id)
 	}
 }
