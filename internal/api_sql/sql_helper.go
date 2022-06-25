@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+func ValidStruct(x interface{}, field_name string, id interface{}) bool {
+	count := int64(0)
+	DB.Model(&x).Where(field_name + " = ?", id).Count(&count)
+	return count > 0
+}
+
 func Deserialize(str string, delim string) []string {
 	return strings.Split(str, delim)
 }

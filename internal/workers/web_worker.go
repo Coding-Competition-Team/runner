@@ -160,10 +160,9 @@ func removeInstance(c *gin.Context) {
 
 func _removeInstance(userid string) { //Run Async
 	log.Debug("Start /removeInstance Request")
-	var NewInstanceTimeout int64 = 0 //Force typecast
 
 	instance := api_sql.GetActiveUserInstance(userid)
-	instance.Instance_Timeout = NewInstanceTimeout //Make sure that the instance will be killed in the next kill cycle
+	instance.Instance_Timeout = int64(0) //Make sure that the instance will be killed in the next kill cycle
 	api_sql.UpdateInstance(instance)
 
 	a, b := ds.InstanceQueue.GetKey(instance.Instance_Id)
@@ -171,7 +170,7 @@ func _removeInstance(userid string) { //Run Async
 		panic("InstanceId is missing in InstanceQueue!")
 	}
 	ds.InstanceQueue.Remove(a)
-	ds.InstanceQueue.Put(NewInstanceTimeout, instance.Instance_Id) //Replace
+	ds.InstanceQueue.Put(int64(0), instance.Instance_Id) //Replace
 
 	log.Debug("Finish /removeInstance Request")
 }

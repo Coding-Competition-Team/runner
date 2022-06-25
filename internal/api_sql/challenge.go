@@ -7,7 +7,7 @@ import (
 )
 
 func ValidChallenge(challid string) bool {
-	return DB.Model(&ds.Challenge{}).Where("challenge_id = ?", challid).RowsAffected != 0
+	return ValidStruct(ds.Challenge{}, "challenge_id", challid)
 }
 
 func GetChallenge(challid string) ds.Challenge {
