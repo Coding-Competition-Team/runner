@@ -6,38 +6,38 @@ import (
 	"runner/internal/ds"
 )
 
-func ValidChallenge(challid string) bool {
-	return ValidStruct(ds.Challenge{}, "challenge_id", challid)
+func ValidRunnerChallenge(challid string) bool {
+	return ValidStruct(ds.RunnerChallenge{}, "challenge_id", challid)
 }
 
-func GetChallenge(challid string) ds.Challenge {
-	var challenge ds.Challenge
+func GetRunnerChallenge(challid string) ds.RunnerChallenge {
+	var challenge ds.RunnerChallenge
 	DB.Where("challenge_id = ?", challid).First(&challenge)
 	return challenge
 }
 
-func GetChallenges() []ds.Challenge {
-	challenges := []ds.Challenge{}
+func GetRunnerChallenges() []ds.RunnerChallenge {
+	challenges := []ds.RunnerChallenge{}
 	DB.Find(&challenges)
 	return challenges
 }
 
-func GetOrCreateChallengeId(Challenge_Name string, Docker_Compose bool, Port_Count int) string {
-	challenge_id := getChallengeId(Challenge_Name)
+func GetOrCreateRunnerChallengeId(Challenge_Name string, Docker_Compose bool, Port_Count int) string {
+	challenge_id := getRunnerChallengeId(Challenge_Name)
 
 	if challenge_id != "" {
 		return challenge_id
 	}
 
 	//If control reaches here, the challenge does not exist in the DB
-	challenge := ds.Challenge{Challenge_Id: ds.GenerateChallengeId(Challenge_Name), Challenge_Name: Challenge_Name, Docker_Compose: Docker_Compose, Port_Count: Port_Count}
+	challenge := ds.RunnerChallenge{Challenge_Id: ds.GenerateChallengeId(Challenge_Name), Challenge_Name: Challenge_Name, Docker_Compose: Docker_Compose, Port_Count: Port_Count}
 	DB.Create(&challenge)
 
-	return getChallengeId(Challenge_Name)
+	return getRunnerChallengeId(Challenge_Name)
 }
 
-func getChallengeId(challenge_name string) string {
-	ch := ds.Challenge{}
+func getRunnerChallengeId(challenge_name string) string {
+	ch := ds.RunnerChallenge{}
 	result := DB.Select("challenge_id").Where("challenge_name = ?", challenge_name).Find(&ch)
 
 	err := result.Error
@@ -50,12 +50,12 @@ func getChallengeId(challenge_name string) string {
 	return ch.Challenge_Id //Assume there are no duplicate challenge names
 }
 
-func UpdateChallenge(ch ds.Challenge) {
+func UpdateRunnerChallenge(ch ds.RunnerChallenge) {
 	if DB.Model(&ch).Where("challenge_id = ?", ch.Challenge_Id).Updates(&ch).RowsAffected == 0 {
 		panic("Updating challenge that does not exist")
 	}
 }
 
-func DeleteChallenge(challid string) {
-	DB.Delete(&ds.Challenge{}, ds.Challenge{Challenge_Id: challid}) //For some reason, db.Delete(&ds.Challenge{}, challid) does not seem to work
+func DeleteRunnerChallenge(challid string) {
+	DB.Delete(&ds.RunnerChallenge{}, ds.RunnerChallenge{Challenge_Id: challid}) //For some reason, db.Delete(&ds.Challenge{}, challid) does not seem to work
 }

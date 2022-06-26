@@ -38,7 +38,7 @@ func validateUserid(userid string) bool {
 }
 
 func validateChallid(challid string) bool {
-	valid := api_sql.ValidChallenge(challid)
+	valid := api_sql.ValidRunnerChallenge(challid)
 	if valid { //If challid exists in ChallengeMap, check if it is not unsafe to launch
 		return !ds.ChallengeUnsafeToLaunch[challid]
 	}
@@ -83,7 +83,7 @@ func addInstance(c *gin.Context) {
 		return
 	}
 
-	ch := api_sql.GetChallenge(challid)
+	ch := api_sql.GetRunnerChallenge(challid)
 
 	var ports ds.PortsInfo
 	ports.Ports_Used = make([]int, ch.Port_Count) //Cannot directly use [ch.PortCount]int
@@ -113,7 +113,7 @@ func _addInstance(userid string, challid string, portainer_url string, Ports []i
 
 	var PortainerId string
 
-	ch := api_sql.GetChallenge(challid)
+	ch := api_sql.GetRunnerChallenge(challid)
 	if ch.Docker_Compose {
 		new_docker_compose := yaml.DockerComposeCopy(ch.Docker_Compose_File, Ports)
 		PortainerId = api_portainer.LaunchStack(portainer_url, ch.Challenge_Name, new_docker_compose, discriminant)
@@ -233,7 +233,7 @@ func getUserStatus(c *gin.Context) {
 
 	instance := api_sql.GetActiveUserInstance(userid)
 
-	c.JSON(http.StatusOK, ds.UserStatus{Running_Instance: true, Challenge_Id: instance.Challenge_Id, Time_Left: int((instance.Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(instance.Portainer_Url), Ports_Used: api_sql.DeserializeI(instance.Ports_Used), Port_Types: api_sql.Deserialize(api_sql.GetChallenge(instance.Challenge_Id).Port_Types, ",")})
+	c.JSON(http.StatusOK, ds.UserStatus{Running_Instance: true, Challenge_Id: instance.Challenge_Id, Time_Left: int((instance.Instance_Timeout-time.Now().UnixNano())/1e9), Host: creds.ExtractHost(instance.Portainer_Url), Ports_Used: api_sql.DeserializeI(instance.Ports_Used), Port_Types: api_sql.Deserialize(api_sql.GetRunnerChallenge(instance.Challenge_Id).Port_Types, ",")})
 
 	log.Debug("Finish /getUserStatus Request")
 }
@@ -296,7 +296,7 @@ func addChallenge(c *gin.Context) {
 		return
 	}
 
-	var raw_challenge_data ds.Challenge
+	var raw_challenge_data ds.RunnerChallenge
 	if err := c.BindJSON(&raw_challenge_data); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
@@ -376,18 +376,18 @@ func addChallenge(c *gin.Context) {
 func _addChallengeDockerCompose(challenge_name string, port_types string, docker_compose_file string) { //Run Async
 	log.Debug("Start /addChallenge Request (Docker Compose)")
 	port_count := yaml.DockerComposePortCount(docker_compose_file)
-	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, true, port_count)
-	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Port_Types: port_types, Docker_Compose: true, Port_Count: port_count, Docker_Compose_File: docker_compose_file}
-	api_sql.UpdateChallenge(ch)
+	challenge_id := api_sql.GetOrCreateRunnerChallengeId(challenge_name, true, port_count)
+	ch := ds.RunnerChallenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Port_Types: port_types, Docker_Compose: true, Port_Count: port_count, Docker_Compose_File: docker_compose_file}
+	api_sql.UpdateRunnerChallenge(ch)
 
 	log.Debug("Finish /addChallenge Request (Docker Compose)")
 }
 
 func _addChallengeNonDockerCompose(challenge_name string, port_types string, internal_port string, image_name string, docker_cmds string) { //Run Async
 	log.Debug("Start /addChallenge Request (Non Docker Compose)")
-	challenge_id := api_sql.GetOrCreateChallengeId(challenge_name, false, 1)
-	ch := ds.Challenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Port_Types: port_types, Docker_Compose: false, Port_Count: 1, Internal_Port: internal_port, Image_Name: image_name, Docker_Cmds: docker_cmds}
-	api_sql.UpdateChallenge(ch)
+	challenge_id := api_sql.GetOrCreateRunnerChallengeId(challenge_name, false, 1)
+	ch := ds.RunnerChallenge{Challenge_Id: challenge_id, Challenge_Name: challenge_name, Port_Types: port_types, Docker_Compose: false, Port_Count: 1, Internal_Port: internal_port, Image_Name: image_name, Docker_Cmds: docker_cmds}
+	api_sql.UpdateRunnerChallenge(ch)
 
 	log.Debug("Finish /addChallenge Request (Non Docker Compose)")
 }
@@ -432,7 +432,7 @@ func _removeChallenge(challid string) { //Run Async
 
 	ClearInstanceQueue() //Manually trigger ClearInstanceQueue() rather than waiting for the Kill Worker
 
-	api_sql.DeleteChallenge(challid)
+	api_sql.DeleteRunnerChallenge(challid)
 
 	delete(ds.ChallengeUnsafeToLaunch, challid)
 
@@ -453,7 +453,7 @@ func getStatus(c *gin.Context) {
 
 	log.Debug("Start /getStatus Request")
 
-	c.JSON(http.StatusOK, ds.RunnerStatus{Current_Instance_Count: api_sql.GetInstanceCount(), Max_Instance_Count: ds.MaxInstanceCount, Instances: api_sql.GetInstances(), Challenges: api_sql.GetChallenges()})
+	c.JSON(http.StatusOK, ds.RunnerStatus{Current_Instance_Count: api_sql.GetInstanceCount(), Max_Instance_Count: ds.MaxInstanceCount, Instances: api_sql.GetInstances(), Challenges: api_sql.GetRunnerChallenges()})
 
 	log.Debug("Finish /getStatus Request")
 }

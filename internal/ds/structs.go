@@ -47,7 +47,7 @@ type RunnerStatus struct {
 	Current_Instance_Count int64
 	Max_Instance_Count     int64
 	Instances              []Instance
-	Challenges             []Challenge
+	Challenges             []RunnerChallenge
 }
 
 type Instance struct {
@@ -60,7 +60,7 @@ type Instance struct {
 	Ports_Used       string
 }
 
-type Challenge struct {
+type RunnerChallenge struct {
 	Challenge_Id   string //Defaults to "" (Unknown ChallengeId)
 	Challenge_Name string
 	Port_Types     string

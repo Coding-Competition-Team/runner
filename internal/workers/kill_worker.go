@@ -90,7 +90,7 @@ func ClearInstanceQueue(){
 		instance := api_sql.GetInstance(InstanceId) //Save a copy of the instance before it gets deleted
 		api_sql.DeleteInstance(InstanceId)
 
-		if api_sql.GetChallenge(instance.Challenge_Id).Docker_Compose {
+		if api_sql.GetRunnerChallenge(instance.Challenge_Id).Docker_Compose {
 			api_portainer.DeleteStack(instance.Portainer_Url, instance.Portainer_Id)
 		} else {
 			api_portainer.DeleteContainer(instance.Portainer_Url, instance.Portainer_Id)
