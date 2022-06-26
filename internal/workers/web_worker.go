@@ -85,7 +85,7 @@ func addInstance(c *gin.Context) {
 
 	ch := api_sql.GetChallenge(challid)
 
-	var ports ds.PortsJson
+	var ports ds.PortsInfo
 	ports.Ports_Used = make([]int, ch.Port_Count) //Cannot directly use [ch.PortCount]int
 	for i := 0; i < ch.Port_Count; i++ {
 		ports.Ports_Used[i] = ds.GetRandomPort()

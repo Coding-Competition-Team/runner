@@ -28,7 +28,7 @@ type CredentialsJson struct {
 	Api_Authorization      string
 }
 
-type PortsJson struct {
+type PortsInfo struct {
 	Host       string
 	Ports_Used []int
 	Port_Types []string
