@@ -12,6 +12,18 @@ import (
 
 var DB *gorm.DB
 
+func createTableIfNotExists(x interface{}) {
+	err := DB.AutoMigrate(&x)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initalizeDB() {
+	createTableIfNotExists(ds.Instance{})
+	createTableIfNotExists(ds.RunnerChallenge{})
+}
+
 func validatePortainerUrl(url string) bool {
 	_, ok := creds.PortainerCreds[url]
 	return ok
@@ -57,6 +69,7 @@ func SyncWithDB() {
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
+	initalizeDB()
 	syncInstances()
 
 	log.Info("DB Sync Complete!")

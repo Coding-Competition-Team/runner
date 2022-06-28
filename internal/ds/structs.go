@@ -51,17 +51,17 @@ type RunnerStatus struct {
 }
 
 type Instance struct {
-	Instance_Id      int
+	Instance_Id      int    `gorm:"primarykey"`
 	Usr_Id           string
 	Challenge_Id     string
 	Portainer_Url    string
 	Portainer_Id     string
-	Instance_Timeout int64 //Unix (Nano) Timestamp of Instance Timeout
+	Instance_Timeout int64  `gorm:"index"` //Unix (Nano) Timestamp of Instance Timeout
 	Ports_Used       string
 }
 
 type RunnerChallenge struct {
-	Challenge_Id   string //Defaults to "" (Unknown ChallengeId)
+	Challenge_Id   string `gorm:"primarykey"` //Defaults to "" (Unknown ChallengeId)
 	Challenge_Name string
 	Port_Types     string
 	Docker_Compose bool
