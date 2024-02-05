@@ -5,8 +5,8 @@ import (
 
 	"runner/internal/api_portainer"
 	"runner/internal/api_sql"
-	"runner/internal/ds"
 	"runner/internal/creds"
+	"runner/internal/ds"
 	"runner/internal/log"
 )
 
@@ -72,9 +72,10 @@ func (w *Worker) Action() {
 }
 
 // Clears the current InstanceQueue for all instances with timestamp <= current_timestamp
-func ClearInstanceQueue(){
+func ClearInstanceQueue() {
 	current_timestamp := time.Now().UnixNano()
-	log.Info("Kill Worker", current_timestamp)
+	// too much log spam
+	// log.Info("Kill Worker", current_timestamp)
 
 	for !ds.InstanceQueue.Empty() {
 		it := ds.InstanceQueue.Iterator()
@@ -84,23 +85,40 @@ func ClearInstanceQueue(){
 		if timestamp > current_timestamp {
 			break
 		}
-		
+
 		log.Info("Clearing Instance", InstanceId)
 
-		instance := api_sql.GetInstance(InstanceId) //Save a copy of the instance before it gets deleted
-		api_sql.DeleteInstance(InstanceId)
-
-		if api_sql.GetRunnerChallenge(instance.Challenge_Id).Docker_Compose {
-			api_portainer.DeleteStack(instance.Portainer_Url, instance.Portainer_Id)
+		instance, err := api_sql.GetInstance(InstanceId)
+		if instance == nil {
+			// instance doesn't exist; let's remove from our internal queue
+			ds.InstanceQueue.Remove(timestamp)
+		} else if err != nil {
+			panic(err)
 		} else {
-			api_portainer.DeleteContainer(instance.Portainer_Url, instance.Portainer_Id)
+			KillInstance(*instance)
+			ds.InstanceQueue.Remove(timestamp)
 		}
 
-		creds.DecrementPortainerQueue(instance.Portainer_Url)
+	}
+}
 
-		ds.InstanceQueue.Remove(timestamp)
-		for _, v := range api_sql.DeserializeI(instance.Ports_Used) {
-			delete(ds.UsedPorts, v)
-		}
+func KillInstance(instance ds.Instance) {
+	log.Info("Clearing Instance", instance.Instance_Id)
+
+	api_sql.DeleteInstance(instance.Instance_Id)
+
+	if api_sql.GetRunnerChallenge(instance.Challenge_Id).Docker_Compose {
+		api_portainer.DeleteStack(instance.Portainer_Url, instance.Portainer_Id)
+	} else {
+		api_portainer.DeleteContainer(instance.Portainer_Url, instance.Portainer_Id)
+	}
+
+	creds.DecrementPortainerQueue(instance.Portainer_Url)
+
+	a, _ := ds.InstanceQueue.GetKey(instance.Instance_Id)
+	ds.InstanceQueue.Remove(a)
+
+	for _, v := range api_sql.DeserializeI(instance.Ports_Used) {
+		delete(ds.UsedPorts, v)
 	}
 }

@@ -14,6 +14,7 @@ import (
 func LaunchContainer(portainer_url string, container_name string, image_name string, cmds []string, internal_port string, _external_port int, discriminant string) string {
 	external_port := strconv.Itoa(_external_port)
 
+    // wtf is this
 	cmd := ""
 	for i, s := range cmds {
 		cmd += "\"" + s + "\""
@@ -113,13 +114,22 @@ func LaunchStack(portainer_url string, stack_name string, docker_compose string,
 		panic(err)
 	}
 
+    // bruh
 	tmp := "{\"name\":\"" + stack_name + "_" + discriminant + "\",\"stackFileContent\":" + string(json_docker_compose) + "}"
+    
+    // tmp := map[string]interface{}{
+    //     "name": stack_name + "_" + discriminant,
+    //     "stackFileContent": string(json_docker_compose),
+    // }
+    log.Debug(tmp)
+    // reqJson, err := json.Marshal(tmp)
 	log.Debug("launchStack Body:", tmp)
 
 	requestBody := []byte(tmp)
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", portainer_url+"/api/stacks?type=2&method=string&endpointId=2", bytes.NewBuffer(requestBody))
+	// req, err := http.NewRequest("POST", portainer_url+"/api/stacks?type=2&method=string&endpointId=2", bytes.NewBuffer(reqJson))
+	req, err := http.NewRequest("POST", portainer_url+"/api/stacks/create/standalone/string?endpointId=2", bytes.NewBuffer(requestBody))
 	if err != nil {
 		panic(err)
 	}
@@ -152,6 +162,7 @@ func DeleteStack(portainer_url string, id string) {
 	client := http.Client{}
 	req, err := http.NewRequest("DELETE", portainer_url+"/api/stacks/"+id+"?endpointId=2", nil)
 	if err != nil {
+        print(portainer_url+"/api/stacks/"+id+"?endpointId=2")
 		panic(err)
 	}
 

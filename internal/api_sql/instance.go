@@ -4,10 +4,12 @@ import (
 	"runner/internal/ds"
 )
 
-func GetInstance(instance_id int) ds.Instance {
-	var instance ds.Instance
-	DB.Where("instance_id = ?", instance_id).First(&instance)
-	return instance
+func GetInstance(instance_id int) (*ds.Instance, error) {
+    instance := &ds.Instance{}
+    if err := DB.Where("instance_id = ?", instance_id).First(&instance).Error; err != nil {
+        return nil, err
+    }
+	return instance, nil
 }
 
 func GetInstances() []ds.Instance {

@@ -94,9 +94,9 @@ func addInstance(c *gin.Context) {
 	ports.Host = creds.ExtractHost(portainer_url)
 	ports.Port_Types = api_sql.Deserialize(ch.Port_Types, ",")
 
-	c.JSON(http.StatusOK, ports)
+	_addInstance(userid, challid, portainer_url, ports.Ports_Used)
 
-	go _addInstance(userid, challid, portainer_url, ports.Ports_Used)
+	c.JSON(http.StatusOK, ports)
 }
 
 func _addInstance(userid string, challid string, portainer_url string, Ports []int) { //Run Async
@@ -105,11 +105,12 @@ func _addInstance(userid string, challid string, portainer_url string, Ports []i
 	ds.NextInstanceId++
 	InstanceTimeout := time.Now().UnixNano() + ds.DefaultNanosecondsPerInstance
 	ds.InstanceQueue.Put(InstanceTimeout, InstanceId) //Use higher precision time to (hopefully) prevent duplicates
-	discriminant := strconv.FormatInt(time.Now().UnixNano(), 10)
+	discriminant := strconv.FormatInt(time.Now().UnixNano(), 10) // prevent container name conflict
 	creds.IncrementPortainerQueue(portainer_url)
 
-	instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Portainer_Url: portainer_url, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
-	api_sql.AddInstance(instance)
+    // no longer relevant, since we wait for the response from portainer
+	// instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Portainer_Url: portainer_url, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ",")} //Everything except PortainerId first, to prevent issues when querying getTimeLeft, etc. while the instance is launching
+	// api_sql.AddInstance(instance)
 
 	var PortainerId string
 
@@ -121,10 +122,11 @@ func _addInstance(userid string, challid string, portainer_url string, Ports []i
 		PortainerId = api_portainer.LaunchContainer(portainer_url, ch.Challenge_Name, ch.Image_Name, api_sql.DeserializeNL(ch.Docker_Cmds), ch.Internal_Port, Ports[0], discriminant)
 	}
 
+	log.Debug("Instance ID:", InstanceId)
 	log.Debug("Portainer ID:", PortainerId)
 
-	instance.Portainer_Id = PortainerId
-	api_sql.SetInstancePortainerId(InstanceId, PortainerId) //Update PortainerId once it's available
+    instance := ds.Instance{Instance_Id: InstanceId, Usr_Id: userid, Challenge_Id: challid, Portainer_Url: portainer_url, Instance_Timeout: InstanceTimeout, Ports_Used: api_sql.SerializeI(Ports, ","), Portainer_Id: PortainerId}
+	api_sql.AddInstance(instance) //Update PortainerId once it's available
 
 	log.Debug("Finish /addInstance Request")
 }
@@ -153,24 +155,31 @@ func removeInstance(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"Success": true})
+	_removeInstance(userid)
 
-	go _removeInstance(userid)
+    log.Debug("returning")
+
+	c.JSON(http.StatusOK, gin.H{"Success": true})
 }
 
-func _removeInstance(userid string) { //Run Async
+func _removeInstance(userid string) {
 	log.Debug("Start /removeInstance Request")
 
 	instance := api_sql.GetActiveUserInstance(userid)
-	instance.Instance_Timeout = int64(0) //Make sure that the instance will be killed in the next kill cycle
+
+	instance.Instance_Timeout = int64(0) // Make sure that the instance will be killed in the next kill cycle
 	api_sql.UpdateInstance(instance)
 
-	a, b := ds.InstanceQueue.GetKey(instance.Instance_Id)
+	_, b := ds.InstanceQueue.GetKey(instance.Instance_Id)
 	if !b {
 		panic("InstanceId is missing in InstanceQueue!")
 	}
-	ds.InstanceQueue.Remove(a)
-	ds.InstanceQueue.Put(int64(0), instance.Instance_Id) //Replace
+
+    // this causes race condition
+	// ds.InstanceQueue.Remove(a) 
+	// ds.InstanceQueue.Put(int64(0), instance.Instance_Id) // Replace
+
+    KillInstance(instance)
 
 	log.Debug("Finish /removeInstance Request")
 }
